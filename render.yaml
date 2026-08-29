@@ -1,0 +1,24 @@
+# Render deployment config for Store Helep
+# Connect this repo in Render ("New Web Service" -> connect repo) and Render
+# will use this file. Set OCR_API_KEY in the Render dashboard (it is NOT here).
+services:
+  - type: web
+    name: store-helep
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OCR_ENABLED
+        value: "true"
+      - key: OCR_PROVIDER
+        value: gemini
+      - key: OCR_MODEL
+        value: gemini-3.6-flash
+      - key: OCR_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent
+      - key: OCR_API_KEY
+        sync: false

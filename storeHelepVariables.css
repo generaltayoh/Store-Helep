@@ -1,0 +1,52 @@
+  :root{
+    --paper:#F7F4EC;
+    --paper-line:#E8E1CC;
+    --card:#FFFFFF;
+    --ink:#12241D;
+    --ink-soft:#5B655D;
+    --ink-faint:#8C9089;
+    --border:#E6E1D2;
+    --emerald:#0B5D3B;
+    --emerald-deep:#073F28;
+    --emerald-tint:#E6F2EB;
+    --amber:#DE8F17;
+    --amber-tint:#FBEFDA;
+    --red:#C7402E;
+    --red-tint:#FAEAE6;
+    --coral:#CD5545;
+    --coral-tint:#F7E4E0;
+    --blue:#2A5FA5;
+    --blue-tint:#E8F0FA;
+    --gray-tint:#F0EEE6;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:10px;
+    --shadow-card:0 1px 2px rgba(18,36,29,0.04), 0 6px 16px rgba(18,36,29,0.06);
+    --shadow-pop:0 10px 30px rgba(7,63,40,0.18);
+  }
+
+  /* ===== Dark theme (toggled via html.dark) ===== */
+  html.dark{
+    --paper:#121a15;
+    --paper-line:#223028;
+    --card:#1b261f;
+    --ink:#E9F1EB;
+    --ink-soft:#A7B3A9;
+    --ink-faint:#76827A;
+    --border:#2c3a31;
+    --emerald:#34B27E;
+    --emerald-deep:#0B5D3B;
+    --emerald-tint:#163025;
+    --amber:#E9A437;
+    --amber-tint:#2c2415;
+    --red:#E2604E;
+    --red-tint:#2e1813;
+    --coral:#E07A6B;
+    --coral-tint:#2a1a16;
+    --blue:#5B91D6;
+    --blue-tint:#15263b;
+    --gray-tint:#222e27;
+    --shadow-card:0 1px 2px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.45);
+    --shadow-pop:0 10px 30px rgba(0,0,0,0.55);
+  }
+  html.dark body { background:#0d130f; }

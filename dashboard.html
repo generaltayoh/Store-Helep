@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F7F4EC">
+  <title>Home · Store Helep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app has-nav">
+
+    <header class="dash-top">
+      <div>
+        <div class="date">monday, 24 august 2026</div>
+        <div class="biz">Business name</div>
+      </div>
+      <div class="menu-wrap">
+        <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+        </button>
+        <div class="dropdown hidden" id="dropdownMenu">
+          <button type="button" id="languageBtn" data-i18n="menu.language">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h9"/><path d="m10 5 3 3-3 3"/><path d="M19 16h-9"/><path d="m14 13-3 3 3 3"/><path d="M4 21V4"/></svg>
+            Language
+          </button>
+          <button type="button" id="businessInfoBtn" data-i18n="menu.business">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            Business Info
+          </button>
+          <button type="button" id="darkModeBtn" data-i18n="menu.darkmode">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+            Dark mode
+          </button>
+          <button type="button" data-i18n="menu.terms">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 22 12 12 22 2 12z"/><path d="M12 7 17 12 12 17 7 12z"/></svg>
+            Terms &amp; policies
+          </button>
+          <button type="button" class="logout" id="logoutBtn" data-i18n="menu.logout">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            Log out
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <section class="sales-card">
+      <div class="row1">
+        <span class="label" data-i18n="dash.todaySales">Today's sales</span>
+        <span class="delta">+12% vs yesterday</span>
+      </div>
+      <div class="amount">FCFA 185,500</div>
+      <div class="sub">32 transactions today</div>
+      <div class="sales-bars" aria-hidden="true">
+        <i style="height:35%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:70%"></i><i style="height:50%"></i><i style="height:85%"></i><i class="hot" style="height:100%"></i><i style="height:60%"></i><i style="height:45%"></i>
+      </div>
+    </section>
+
+    <section class="stat-grid">
+      <div class="card stat-card">
+        <div class="label" data-i18n="dash.estProfit">Estimated profit</div>
+        <div class="value emerald">FCFA 61,400</div>
+      </div>
+      <div class="card stat-card">
+        <div class="label" data-i18n="dash.productsSold">Products sold</div>
+        <div class="value">118 units</div>
+      </div>
+      <div class="card stat-card">
+        <div class="label" data-i18n="dash.lowStock">Low stock</div>
+        <div class="value red">5 items</div>
+      </div>
+    </section>
+
+    <section class="dash-section">
+      <h2 class="section-title" data-i18n="dash.quickActions">Quick actions</h2>
+      <div class="quick-row">
+        <button class="quick-btn scan" data-nav="scan.html">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
+          <span data-i18n="dash.scanRecords">Scan records</span>
+        </button>
+        <button class="quick-btn excel">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 12 6 6"/><path d="m15 12-6 6"/></svg>
+          <span data-i18n="dash.viewExcel">View as excel</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="dash-section">
+      <h2 class="section-title" data-i18n="dash.attentionHeader">Needs your attention</h2>
+
+      <a class="card attention-card" href="products.html">
+        <span class="icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>
+        </span>
+        <span class="txt">
+          <b>5 products are low in stock</b>
+          <span>Restock soon to avoid missed sales</span>
+        </span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </a>
+
+      <a class="card attention-card" href="products.html">
+        <span class="icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>
+        </span>
+        <span class="txt">
+          <b>5 products are out of stock</b>
+          <span>Restock soon to avoid missed sales</span>
+        </span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </a>
+    </section>
+
+    <nav class="bottom-nav">
+      <a class="nav-item active" href="dashboard.html" data-i18n="nav.home">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Home
+      </a>
+      <a class="nav-item" href="records.html" data-i18n="nav.records">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
+        Records
+      </a>
+      <a class="nav-item scan" href="scan.html" data-i18n="nav.scan">
+        <span class="scan-circle">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
+        </span>
+        <span>Scan</span>
+      </a>
+      <a class="nav-item" href="products.html" data-i18n="nav.products">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>
+        Products
+      </a>
+      <a class="nav-item" href="analytics.html" data-i18n="nav.analytics">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/></svg>
+        Analytics
+      </a>
+    </nav>
+
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>

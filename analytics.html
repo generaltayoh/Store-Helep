@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F7F4EC">
+  <title>Analytics · Store Helep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app has-nav">
+
+    <section class="analytics-page">
+      <h1 class="page-title" data-i18n="ana.title">Analytics</h1>
+
+      <div class="chips chip-row" data-chips>
+        <button class="chip active" data-value="today" data-i18n="rec.today">Today</button>
+        <button class="chip" data-value="7d" data-i18n="ana.7days">7 days</button>
+        <button class="chip" data-value="30d" data-i18n="ana.30days">30 days</button>
+        <button class="chip" data-value="custom" data-i18n="rec.custom">Custom</button>
+      </div>
+
+      <div class="stat-grid-2" style="margin-top:14px;">
+        <div class="card stat-box">
+          <div class="label" data-i18n="ana.totalSales">Total sales</div>
+          <div class="value">FCFA 185,500</div>
+        </div>
+        <div class="card stat-box">
+          <div class="label" data-i18n="ana.numberOfSales">Number of sales</div>
+          <div class="value">32</div>
+        </div>
+        <div class="card stat-box">
+          <div class="label" data-i18n="ana.avgTransaction">Avg. transaction</div>
+          <div class="value">FCFA 5,797</div>
+        </div>
+        <div class="card stat-box">
+          <div class="label" data-i18n="ana.estProfit">Est. profit</div>
+          <div class="value" style="color:var(--emerald);">FCFA 61,400</div>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-area"></div>
+        <div class="chart-labels">
+          <span data-i18n="ana.mon">Mon</span><span data-i18n="ana.tue">Tue</span><span data-i18n="ana.wed">Wed</span><span data-i18n="ana.thu">Thu</span><span data-i18n="ana.fri">Fri</span><span data-i18n="ana.sat">Sat</span><b data-i18n="ana.sun">Sun</b>
+        </div>
+      </div>
+
+      <h2 class="day-label" data-i18n="ana.best">Best-selling products</h2>
+
+      <div class="card rank-card">
+        <span class="avatar green">CC</span>
+        <span class="mid">
+          <b>Coca-Cola 50cl</b>
+          <span>64 units sold</span>
+        </span>
+        <span class="right">
+          <b>FCFA 32,000</b>
+          <span class="badge green">↑ 18%</span>
+        </span>
+      </div>
+
+      <div class="card rank-card">
+        <span class="avatar gray">RB</span>
+        <span class="mid">
+          <b>Rice bag 25kg</b>
+          <span>9 units sold</span>
+        </span>
+        <span class="right">
+          <b>FCFA 144,000</b>
+          <span class="badge gray">→ steady</span>
+        </span>
+      </div>
+
+      <h2 class="day-label" data-i18n="ana.slow">Slow-moving products</h2>
+
+      <div class="card rank-card">
+        <span class="avatar amber">CB</span>
+        <span class="mid">
+          <b>Candle Box</b>
+          <span>1 unit sold in 30 days</span>
+        </span>
+        <span class="right">
+          <b></b>
+          <span class="badge amber">↓ slow</span>
+        </span>
+      </div>
+    </section>
+
+    <nav class="bottom-nav">
+      <a class="nav-item" href="dashboard.html" data-i18n="nav.home">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Home
+      </a>
+      <a class="nav-item" href="records.html" data-i18n="nav.records">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
+        Records
+      </a>
+      <a class="nav-item scan" href="scan.html" data-i18n="nav.scan">
+        <span class="scan-circle">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
+        </span>
+        <span>Scan</span>
+      </a>
+      <a class="nav-item" href="products.html" data-i18n="nav.products">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>
+        Products
+      </a>
+      <a class="nav-item active" href="analytics.html" data-i18n="nav.analytics">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/></svg>
+        Analytics
+      </a>
+    </nav>
+
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F7F4EC">
+  <title>Records · Store Helep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app has-nav">
+
+    <section class="records-page">
+      <h1 class="page-title" data-i18n="rec.title">Records</h1>
+
+      <div class="chips chip-row" data-chips>
+        <button class="chip active" data-value="today" data-i18n="rec.today">Today</button>
+        <button class="chip" data-value="this_week" data-i18n="rec.week">This week</button>
+        <button class="chip" data-value="this_month" data-i18n="rec.month">This month</button>
+        <button class="chip amber" data-value="custom" data-i18n="rec.custom">Custom</button>
+      </div>
+
+      <h2 class="day-label">Today · 16 Aug 2026</h2>
+      <div class="record-list">
+        <div class="card record-card">
+          <span class="avatar green">CC</span>
+          <span class="mid">
+            <b>Coca-Cola × 5</b>
+            <span>9:14 AM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 2,500</b>
+            <span class="badge blue">Scanned</span>
+          </span>
+        </div>
+
+        <div class="card record-card">
+          <span class="avatar green">CC</span>
+          <span class="mid">
+            <b>Coca-Cola × 5</b>
+            <span>9:14 AM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 2,500</b>
+            <span class="badge blue">Scanned</span>
+          </span>
+        </div>
+
+        <div class="card record-card">
+          <span class="avatar green">CC</span>
+          <span class="mid">
+            <b>Coca-Cola × 5</b>
+            <span>9:14 AM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 2,500</b>
+            <span class="badge blue">Scanned</span>
+          </span>
+        </div>
+
+        <div class="card record-card">
+          <span class="avatar green">CC</span>
+          <span class="mid">
+            <b>Coca-Cola × 5</b>
+            <span>9:14 AM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 2,500</b>
+            <span class="badge blue">Scanned</span>
+          </span>
+        </div>
+
+        <div class="card record-card">
+          <span class="avatar green">CC</span>
+          <span class="mid">
+            <b>Coca-Cola × 5</b>
+            <span>9:14 AM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 2,500</b>
+            <span class="badge blue">Scanned</span>
+          </span>
+        </div>
+
+        <div class="card record-card">
+          <span class="avatar gray">RB</span>
+          <span class="mid">
+            <b>Rice bag 25kg × 1</b>
+            <span>8:52 AM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 16,000</b>
+            <span class="badge gray">Manual</span>
+          </span>
+        </div>
+      </div>
+
+      <h2 class="day-label">Yesterday · 15 Aug 2026</h2>
+      <div class="record-list">
+        <div class="card record-card">
+          <span class="avatar blue">BS</span>
+          <span class="mid">
+            <b>Blue Band Sachet × 12</b>
+            <span>4:20 PM</span>
+          </span>
+          <span class="right">
+            <b>FCFA 3,600</b>
+            <span class="badge blue">Scanned</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <nav class="bottom-nav">
+      <a class="nav-item" href="dashboard.html" data-i18n="nav.home">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Home
+      </a>
+      <a class="nav-item active" href="records.html" data-i18n="nav.records">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/></svg>
+        Records
+      </a>
+      <a class="nav-item scan" href="scan.html" data-i18n="nav.scan">
+        <span class="scan-circle">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
+        </span>
+        <span>Scan</span>
+      </a>
+      <a class="nav-item" href="products.html" data-i18n="nav.products">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>
+        Products
+      </a>
+      <a class="nav-item" href="analytics.html" data-i18n="nav.analytics">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/></svg>
+        Analytics
+      </a>
+    </nav>
+
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>

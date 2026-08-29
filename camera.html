@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#10130C">
+  <title>Scanning · Store Helep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app camera-app">
+
+    <section class="cam-view">
+      <div class="cam-top">
+        <button class="cam-btn" data-nav="scan.html" aria-label="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <span class="page-pill" data-i18n="scan.page">Page 1</span>
+        <button class="cam-btn" id="flashBtn" aria-label="Flash">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8L19 10h-7z"/></svg>
+        </button>
+      </div>
+
+      <div class="viewfinder">
+        <video id="camVideo" class="cam-video" autoplay muted playsinline></video>
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+        <span class="hint-pill" data-i18n="scan.fitFrame">Fit the whole page inside the frame</span>
+        <div class="mock-lines"><i></i><i></i><i></i></div>
+        <div class="cam-gate" id="camGate">
+          <span class="gate-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2z"/><circle cx="12" cy="13" r="3.2"/></svg>
+          </span>
+          <h2 data-i18n="camera.gateTitle">Camera access</h2>
+          <p data-i18n="camera.gateMsg">Allow Store Helep to use your camera to scan your record pages.</p>
+          <button class="btn btn-primary" id="enableCamBtn" data-i18n="camera.enable">Enable camera</button>
+        </div>
+      </div>
+
+      <div class="cam-controls">
+        <button class="side-btn" aria-label="Gallery">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-4-4L5 21"/></svg>
+        </button>
+        <button class="shutter" id="shutterBtn" aria-label="Take photo"></button>
+        <button class="side-btn count" id="pageCount">0</button>
+      </div>
+    </section>
+
+    <div class="cam-spacer"></div>
+
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>
