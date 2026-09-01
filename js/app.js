@@ -136,6 +136,12 @@ const I18N = {
     "camera.none": "No camera was found on this device.",
     "camera.error": "We couldn't start the camera.",
     "camera.captured": "Page captured",
+    "camera.title": "Scanner",
+    "camera.reviewTitle": "Review pages",
+    "camera.scan": "SCAN",
+    "camera.scanNow": "SCAN NOW",
+    "camera.retake": "Retake",
+    "camera.noPhotos": "No pages captured yet.",
     "biz.title": "Business info", "biz.name": "Business name", "biz.email": "Business email",
     "biz.type": "Business type", "biz.currency": "Currency", "biz.location": "Location",
     "biz.fCFA": "FCFA — Central African Franc", "biz.xaf": "XAF — Central African CFA",
@@ -264,6 +270,12 @@ const I18N = {
     "camera.none": "Aucune caméra trouvée sur cet appareil.",
     "camera.error": "Impossible de démarrer la caméra.",
     "camera.captured": "Page capturée",
+    "camera.title": "Scanner",
+    "camera.reviewTitle": "Vérifier les pages",
+    "camera.scan": "SCANNER",
+    "camera.scanNow": "SCAN MAINTENANT",
+    "camera.retake": "Refaire",
+    "camera.noPhotos": "Aucune page capturée pour l'instant.",
     "biz.title": "Infos entreprise", "biz.name": "Nom de l'entreprise", "biz.email": "Email de l'entreprise",
     "biz.type": "Type d'entreprise", "biz.currency": "Devise", "biz.location": "Emplacement",
     "biz.fCFA": "FCFA — Franc CFA d'Afrique centrale", "biz.xaf": "XAF — CFA d'Afrique centrale",
@@ -573,8 +585,17 @@ function initCamera() {
   const enableBtn = document.getElementById("enableCamBtn");
   const shutterBtn = document.getElementById("shutterBtn");
   const pageCount = document.getElementById("pageCount");
+  const flashBtn = document.getElementById("flashBtn");
+  const reviewBtn = document.getElementById("reviewBtn");
+  const reviewClose = document.getElementById("reviewClose");
+  const camReview = document.getElementById("camReview");
+  const camView = document.querySelector(".cam-view");
+  const thumbGrid = document.getElementById("thumbGrid");
+  const scanNowBtn = document.getElementById("scanNowBtn");
   let stream = null;
   let pages = [];
+  let retakeIndex = null;
+  let torchOn = false;
 
   function showGateMessage(msg) {
     if (gate) gate.classList.remove("hidden");
@@ -608,7 +629,22 @@ function initCamera() {
     }
   }
 
+  async function toggleTorch() {
+    if (!stream) { startCamera(); return; }
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    torchOn = !torchOn;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+      if (flashBtn) flashBtn.classList.toggle("active", torchOn);
+    } catch (e) {
+      torchOn = !torchOn;
+      toast(t("camera.flashUnsupported"), "error");
+    }
+  }
+
   if (enableBtn) enableBtn.addEventListener("click", startCamera);
+  if (flashBtn) flashBtn.addEventListener("click", toggleTorch);
 
   if (shutterBtn) {
     shutterBtn.addEventListener("click", () => {
@@ -618,9 +654,87 @@ function initCamera() {
       canvas.height = video.videoHeight || 960;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      pages.push(canvas.toDataURL("image/jpeg", 0.85));
+      const data = canvas.toDataURL("image/jpeg", 0.85);
+      if (retakeIndex !== null) {
+        pages[retakeIndex] = data;
+        retakeIndex = null;
+      } else {
+        pages.push(data);
+      }
       if (pageCount) pageCount.textContent = String(pages.length);
       toast(t("camera.captured"));
+    });
+  }
+
+  function showReview(on) {
+    if (camReview) camReview.hidden = !on;
+    if (camView) camView.hidden = on;
+    if (on) renderThumbGrid();
+  }
+
+  function renderThumbGrid() {
+    if (!thumbGrid) return;
+    if (!pages.length) {
+      thumbGrid.innerHTML = `<p class="lede">${t("camera.noPhotos")}</p>`;
+      return;
+    }
+    thumbGrid.innerHTML = pages
+      .map(
+        (src, i) => `<div class="thumb-item">
+          <button class="thumb-x" data-i="${i}" aria-label="Remove">✕</button>
+          <img src="${src}" alt="page ${i + 1}" />
+          <button class="thumb-retake" data-i="${i}">${t("camera.retake")}</button>
+        </div>`
+      )
+      .join("");
+  }
+
+  if (reviewBtn) reviewBtn.addEventListener("click", () => showReview(true));
+  if (reviewClose) reviewClose.addEventListener("click", () => showReview(false));
+
+  if (thumbGrid) {
+    thumbGrid.addEventListener("click", (e) => {
+      const x = e.target.closest(".thumb-x");
+      const rt = e.target.closest(".thumb-retake");
+      if (x) {
+        const i = Number(x.dataset.i);
+        pages.splice(i, 1);
+        renderThumbGrid();
+        if (pageCount) pageCount.textContent = String(pages.length);
+      } else if (rt) {
+        const i = Number(rt.dataset.i);
+        retakeIndex = i;
+        pages.splice(i, 1);
+        if (pageCount) pageCount.textContent = String(pages.length);
+        showReview(false);
+      }
+    });
+  }
+
+  if (scanNowBtn) {
+    scanNowBtn.addEventListener("click", async () => {
+      if (!pages.length) {
+        toast(t("camera.noPhotos"), "error");
+        return;
+      }
+      scanNowBtn.disabled = true;
+      const prevText = scanNowBtn.textContent;
+      scanNowBtn.textContent = t("scan.scanning");
+      try {
+        let firstId = null;
+        for (const src of pages) {
+          const blob = await (await fetch(src)).blob();
+          const fd = new FormData();
+          fd.append("image", blob, "page.jpg");
+          const scan = await api("/scans", { method: "POST", body: fd, auth: false });
+          if (!firstId) firstId = scan.id;
+        }
+        window.location.href = "scan.html?scan=" + encodeURIComponent(firstId);
+      } catch (err) {
+        scanNowBtn.disabled = false;
+        scanNowBtn.textContent = prevText;
+        toast(err.message || t("scan.failed"), "error");
+      }
     });
   }
 

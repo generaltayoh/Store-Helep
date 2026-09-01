@@ -177,7 +177,7 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg") {
     // Log and fall back to mock so the flow always works in development.
     console.warn("[ocrService] AI provider unavailable, using mock:", e.message);
   }
-  if (!rows) rows = mockExtract(imageBuffer, fileName);
+  if (!rows || (Array.isArray(rows) && rows.length === 0)) rows = mockExtract(imageBuffer, fileName);
 
   const extracted = rows.map((r) => ({
     id: nextId("ext"),
