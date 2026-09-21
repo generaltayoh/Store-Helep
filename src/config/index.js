@@ -65,4 +65,9 @@ export const config = {
     enabled: process.env.OCR_ENABLED === "true",
     apiKey: process.env.OCR_API_KEY || process.env.AI_OCR_API_KEY || null,
   },
+  supabase: {
+    url: process.env.SUPABASE_URL || null,
+    anonKey: process.env.SUPABASE_ANON_KEY || null,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || null,
+  },
 };

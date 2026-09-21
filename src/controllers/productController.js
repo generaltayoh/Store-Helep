@@ -6,60 +6,140 @@ import {
   createProduct,
   findProduct,
 } from "../services/inventoryService.js";
+import { isSupabaseConfigured } from "../config/supabase.js";
+import { supabaseService } from "../services/supabaseService.js";
 
-export function getProducts(req, res) {
-  const { category, stockStatus } = req.query;
-  const products = listProducts({ category, stockStatus }).map((p) => ({
-    ...p,
-    stockValue: p.unitPrice * p.stockQty,
-  }));
-  res.json({ products, count: products.length });
-}
+export async function getProducts(req, res, next) {
+  try {
+    const { category, stockStatus } = req.query;
 
-export function getProductStats(req, res) {
-  const stats = productStats();
-  res.json({ ...stats });
-}
+    if (isSupabaseConfigured()) {
+      const products = await supabaseService.listProducts({ category, stockStatus });
+      return res.json({ products, count: products.length });
+    }
 
-export function createProductHandler(req, res) {
-  const { sku, name, category, unitPrice, stockQty } = req.body;
-  if (!sku || !name || !category || unitPrice === undefined) {
-    return res
-      .status(400)
-      .json({ error: "sku, name, category and unitPrice are required." });
+    const products = listProducts({ category, stockStatus }).map((p) => ({
+      ...p,
+      stockValue: p.unitPrice * p.stockQty,
+    }));
+    res.json({ products, count: products.length });
+  } catch (err) {
+    next(err);
   }
-  if (db.products.some((p) => p.sku === sku)) {
-    return res.status(409).json({ error: "A product with this SKU already exists." });
+}
+
+export async function getProductStats(req, res, next) {
+  try {
+    if (isSupabaseConfigured()) {
+      const stats = await supabaseService.getProductStats();
+      return res.json({ ...stats });
+    }
+
+    const stats = productStats();
+    res.json({ ...stats });
+  } catch (err) {
+    next(err);
   }
-  const product = createProduct({ sku, name, category, unitPrice, stockQty: stockQty || 0 });
-  db.products.push(product);
-  res.status(201).json({ product: withStatus(product) });
 }
 
-export function getProduct(req, res) {
-  const product = findProduct(req.params.id);
-  if (!product) return res.status(404).json({ error: "Product not found." });
-  res.json({ product: withStatus(product) });
-}
+export async function createProductHandler(req, res, next) {
+  try {
+    const { sku, name, category, unitPrice, stockQty } = req.body;
+    if (!sku || !name || !category || unitPrice === undefined) {
+      return res
+        .status(400)
+        .json({ error: "sku, name, category and unitPrice are required." });
+    }
 
-export function updateProduct(req, res) {
-  const product = findProduct(req.params.id);
-  if (!product) return res.status(404).json({ error: "Product not found." });
-  const { name, category, unitPrice, stockQty } = req.body;
-  if (name !== undefined) product.name = name;
-  if (category !== undefined) product.category = category;
-  if (unitPrice !== undefined) product.unitPrice = Number(unitPrice);
-  if (stockQty !== undefined) product.stockQty = Number(stockQty);
-  res.json({ product: withStatus(product) });
-}
+    if (isSupabaseConfigured()) {
+      const existing = await supabaseService.listProducts();
+      if (existing.some((p) => p.sku === sku)) {
+        return res.status(409).json({ error: "A product with this SKU already exists." });
+      }
+      const product = await supabaseService.createProduct({
+        sku,
+        name,
+        category,
+        unitPrice,
+        stockQty: stockQty || 0,
+      });
+      return res.status(201).json({ product });
+    }
 
-export function restockProduct(req, res) {
-  const product = findProduct(req.params.id);
-  if (!product) return res.status(404).json({ error: "Product not found." });
-  const addQty = Number(req.body.addQty);
-  if (!Number.isFinite(addQty) || addQty <= 0) {
-    return res.status(400).json({ error: "addQty must be a positive number." });
+    if (db.products.some((p) => p.sku === sku)) {
+      return res.status(409).json({ error: "A product with this SKU already exists." });
+    }
+    const product = createProduct({ sku, name, category, unitPrice, stockQty: stockQty || 0 });
+    db.products.push(product);
+    res.status(201).json({ product: withStatus(product) });
+  } catch (err) {
+    next(err);
   }
-  product.stockQty = (product.stockQty || 0) + addQty;
-  res.json({ product: withStatus(product) });
+}
+
+export async function getProduct(req, res, next) {
+  try {
+    if (isSupabaseConfigured()) {
+      const product = await supabaseService.getProduct(req.params.id);
+      if (!product) return res.status(404).json({ error: "Product not found." });
+      return res.json({ product });
+    }
+
+    const product = findProduct(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found." });
+    res.json({ product: withStatus(product) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateProduct(req, res, next) {
+  try {
+    const { name, category, unitPrice, stockQty } = req.body;
+
+    if (isSupabaseConfigured()) {
+      const product = await supabaseService.getProduct(req.params.id);
+      if (!product) return res.status(404).json({ error: "Product not found." });
+      const updated = await supabaseService.updateProduct(req.params.id, {
+        name,
+        category,
+        unitPrice,
+        stockQty,
+      });
+      return res.json({ product: updated });
+    }
+
+    const product = findProduct(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found." });
+    if (name !== undefined) product.name = name;
+    if (category !== undefined) product.category = category;
+    if (unitPrice !== undefined) product.unitPrice = Number(unitPrice);
+    if (stockQty !== undefined) product.stockQty = Number(stockQty);
+    res.json({ product: withStatus(product) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function restockProduct(req, res, next) {
+  try {
+    const addQty = Number(req.body.addQty);
+    if (!Number.isFinite(addQty) || addQty <= 0) {
+      return res.status(400).json({ error: "addQty must be a positive number." });
+    }
+
+    if (isSupabaseConfigured()) {
+      const product = await supabaseService.getProduct(req.params.id);
+      if (!product) return res.status(404).json({ error: "Product not found." });
+      const updated = await supabaseService.restockProduct(req.params.id, addQty);
+      return res.json({ product: updated });
+    }
+
+    const product = findProduct(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found." });
+    product.stockQty = (product.stockQty || 0) + addQty;
+    res.json({ product: withStatus(product) });
+  } catch (err) {
+    next(err);
+  }
 }

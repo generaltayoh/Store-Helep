@@ -14,8 +14,16 @@ import { db, nextId } from "../data/store.js";
  * is agnostic to where the extraction comes from.
  */
 
+const FALLBACK_ITEMS = [
+  { name: "Mineral Water 1.5L", unitPrice: 400 },
+  { name: "Bread Loaf", unitPrice: 500 },
+  { name: "Sugar 1kg", unitPrice: 900 },
+  { name: "Soap Bar", unitPrice: 350 },
+  { name: "Cooking Oil 1L", unitPrice: 1500 },
+];
+
 function pickProducts(n) {
-  const pool = [...db.products];
+  const pool = db.products.length > 0 ? db.products : FALLBACK_ITEMS;
   const out = [];
   for (let i = 0; i < n; i++) {
     const p = pool[(Math.random() * pool.length) | 0];
@@ -31,14 +39,27 @@ function pickProducts(n) {
 }
 
 // Mock extractor — returns plausible rows with a confidence score.
-function mockExtract(imageBuffer, fileName) {
-  const count = 3 + ((Math.random() * 6) | 0); // 3..8 records
+function mockExtract(imageBuffer, fileName, recordMethod = "Notebook") {
+  let count = 3 + ((Math.random() * 6) | 0); // 3..8 records
+  if (recordMethod === "Receipts") {
+    count = 2 + ((Math.random() * 3) | 0); // fewer, cleaner items
+  } else if (recordMethod === "Spreadsheet") {
+    count = 4 + ((Math.random() * 5) | 0); // more structured items
+  } else if (recordMethod === "Other") {
+    count = 3 + ((Math.random() * 4) | 0); // mixed/unclear format
+  }
   const rows = pickProducts(count).map((r) => ({
     ...r,
     date: new Date(),
   }));
-  // Inject one low-confidence row to exercise the "needs review" path.
-  if (rows.length) {
+  // Adjust confidence and unknown injection based on method
+  let injectUnknown = true;
+  if (recordMethod === "Receipts") injectUnknown = Math.random() < 0.3;
+  else if (recordMethod === "Spreadsheet") injectUnknown = Math.random() < 0.1;
+  else if (recordMethod === "Other") injectUnknown = Math.random() < 0.45; // mixed uncertainty
+  else injectUnknown = Math.random() < 0.6; // Notebook: high chance
+
+  if (injectUnknown && rows.length) {
     rows[0] = {
       ...rows[0],
       productName: "Unknown item",
@@ -59,6 +80,7 @@ function guessMime(fileName = "") {
 }
 
 const OCR_SYSTEM_PROMPT = `You are an OCR engine for a small-store record-keeping app.
+The user records sales using the method: {record_method}.
 Given a photo of a handwritten or printed store record / sales page / delivery note,
 extract every line item into structured JSON.
 
@@ -77,8 +99,9 @@ Rules:
 - Omit rows you cannot read; do not invent items.
 - Return an empty records array if the image has no readable items.`;
 
-async function callAiProvider(imageBuffer, fileName) {
+async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") {
   if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) return null;
+  const promptWithMethod = OCR_SYSTEM_PROMPT.replace("{record_method}", recordMethod);
 
   const base64 = imageBuffer.toString("base64");
   const mime = guessMime(fileName);
@@ -86,7 +109,7 @@ async function callAiProvider(imageBuffer, fileName) {
   // Gemini native API (required for AQ.-prefixed AI Studio keys)
   if (config.ai.provider === "gemini") {
     const body = {
-      systemInstruction: { parts: [{ text: OCR_SYSTEM_PROMPT }] },
+      systemInstruction: { parts: [{ text: promptWithMethod }] },
       contents: [
         {
           parts: [
@@ -128,7 +151,7 @@ async function callAiProvider(imageBuffer, fileName) {
     temperature: 0.1,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: OCR_SYSTEM_PROMPT },
+      { role: "system", content: promptWithMethod },
       {
         role: "user",
         content: [
@@ -163,7 +186,7 @@ async function callAiProvider(imageBuffer, fileName) {
   return Array.isArray(rows) ? rows : [];
 }
 
-export async function extractRecords(imageBuffer, fileName = "upload.jpg") {
+export async function extractRecords(imageBuffer, fileName = "upload.jpg", recordMethod = "Notebook") {
   if (!Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
     const err = new Error("A non-empty image buffer is required.");
     err.status = 400;
@@ -172,12 +195,12 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg") {
 
   let rows = null;
   try {
-    rows = await callAiProvider(imageBuffer, fileName);
+    rows = await callAiProvider(imageBuffer, fileName, recordMethod);
   } catch (e) {
     // Log and fall back to mock so the flow always works in development.
     console.warn("[ocrService] AI provider unavailable, using mock:", e.message);
   }
-  if (!rows || (Array.isArray(rows) && rows.length === 0)) rows = mockExtract(imageBuffer, fileName);
+  if (!rows || (Array.isArray(rows) && rows.length === 0)) rows = mockExtract(imageBuffer, fileName, recordMethod);
 
   const extracted = rows.map((r) => ({
     id: nextId("ext"),

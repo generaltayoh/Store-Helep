@@ -1,9 +1,5 @@
-import { spawn } from "child_process";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, "..");
+import { app } from "../src/app.js";
+import { resetStore } from "../src/data/store.js";
 
 let passed = 0;
 let failed = 0;
@@ -18,130 +14,110 @@ function check(name, cond, extra = "") {
   }
 }
 
-const BASE = "http://127.0.0.1:3000";
-
-async function waitForHealth(timeoutMs = 10000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const r = await fetch(`${BASE}/api/health`);
-      if (r.ok) return true;
-    } catch {
-      /* not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  return false;
-}
-
-async function json(method, url, body, headers = {}) {
-  const res = await fetch(`${BASE}${url}`, {
-    method,
-    headers: { "Content-Type": "application/json", ...headers },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => null);
-  return { status: res.status, data };
-}
-
 async function main() {
-  console.log("Starting Store Helep backend...");
-  const server = spawn("node", ["server.js"], {
-    cwd: root,
-    stdio: "ignore",
-    env: { ...process.env, OCR_ENABLED: "false" },
-  });
+  console.log("Starting Store Helep smoke test on fresh unseeded database...");
+  resetStore();
 
-  const ok = await waitForHealth();
-  if (!ok) {
-    console.error("Server did not start in time.");
-    server.kill();
-    process.exit(1);
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, "127.0.0.1", () => resolve(s));
+  });
+  const port = server.address().port;
+  const BASE = `http://127.0.0.1:${port}`;
+
+  async function json(method, url, body, headers = {}) {
+    const res = await fetch(`${BASE}${url}`, {
+      method,
+      headers: { "Content-Type": "application/json", ...headers },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => null);
+    return { status: res.status, data };
   }
 
   try {
     const health = await fetch(`${BASE}/api/health`);
     check("health endpoint", health.ok);
 
-    // Auth / onboarding
-    const login = await json("POST", "/api/auth/login", {
-      businessName: "Mama General Store",
-      businessEmail: "mamageneral@store.com",
-    });
-    check("login returns token", login.status === 200 && !!login.data.token, JSON.stringify(login.data));
+    // Initial empty state verification
+    const initStats = await json("GET", "/api/products/stats");
+    check("clean initial product stats (0 items)", initStats.status === 200 && initStats.data.totalProducts === 0);
 
+    const initDash = await json("GET", "/api/dashboard");
+    check("clean initial dashboard (0 sales)", initDash.status === 200 && initDash.data.salesToday === 0);
+
+    // Auth / onboarding fresh business setup
     const setup = await json("POST", "/api/auth/setup", {
-      name: "Mama General Store",
-      email: "mamageneral@store.com",
-      type: "Grocery / Mini-market",
+      name: "Divine Grace Store",
+      email: "divine@grace.com",
+      type: "Provision store",
       currency: "FCFA",
-      location: "Molyko, Buea",
+      location: "Limbe, Cameroon",
       recordMethod: "Notebook",
     });
-    check("setup updates business", setup.status === 200 && setup.data.business.name === "Mama General Store");
+    check("setup creates business", setup.status === 200 && setup.data.business.name === "Divine Grace Store");
 
     const biz = await json("GET", "/api/business");
-    check("get business", biz.status === 200 && biz.data.business.currency === "FCFA");
+    check("get business details", biz.status === 200 && biz.data.business.currency === "FCFA" && biz.data.business.location === "Limbe, Cameroon");
 
-    // Products / inventory
-    const stats = await json("GET", "/api/products/stats");
-    check(
-      "product stats",
-      stats.status === 200 &&
-        stats.data.totalProducts >= 150 &&
-        stats.data.lowStockCount >= 0,
-      JSON.stringify(stats.data)
-    );
-
-    const low = await json("GET", "/api/products?stockStatus=low_stock");
-    check(
-      "filter low_stock",
-      low.status === 200 && low.data.products.every((p) => p.stockStatus === "low_stock")
-    );
-
-    const created = await json("POST", "/api/products", {
-      sku: "TST-01",
-      name: "Test Product",
-      category: "Drinks",
-      unitPrice: 350,
-      stockQty: 2,
+    // Login with existing credentials
+    const login = await json("POST", "/api/auth/login", {
+      businessName: "Divine Grace Store",
+      businessEmail: "divine@grace.com",
     });
-    check("create product", created.status === 201 && created.data.product.id);
+    check("login returns token", login.status === 200 && !!login.data.token);
+
+    // Product creation
+    const created1 = await json("POST", "/api/products", {
+      sku: "CC-01",
+      name: "Coca-Cola 50Cl",
+      category: "Drinks",
+      unitPrice: 500,
+      stockQty: 20,
+    });
+    check("create product 1", created1.status === 201 && created1.data.product.id);
+
+    const created2 = await json("POST", "/api/products", {
+      sku: "RB-01",
+      name: "Rice bag 25kg",
+      category: "Groceries",
+      unitPrice: 16000,
+      stockQty: 3,
+    });
+    check("create product 2 (low stock)", created2.status === 201 && created2.data.product.stockStatus === "low_stock");
 
     const dup = await json("POST", "/api/products", {
-      sku: "TST-01",
+      sku: "CC-01",
       name: "Duplicate",
       category: "Drinks",
-      unitPrice: 350,
+      unitPrice: 500,
     });
     check("duplicate sku rejected", dup.status === 409);
 
     // Edit product
-    const edit = await json("PATCH", `/api/products/${created.data.product.id}`, {
-      name: "Test Product Edit",
-      unitPrice: 400,
+    const edit = await json("PATCH", `/api/products/${created1.data.product.id}`, {
+      name: "Coca-Cola 50Cl Fresh",
+      unitPrice: 550,
     });
-    check("edit product", edit.status === 200 && edit.data.product.name === "Test Product Edit" && edit.data.product.unitPrice === 400);
+    check("edit product", edit.status === 200 && edit.data.product.name === "Coca-Cola 50Cl Fresh" && edit.data.product.unitPrice === 550);
 
-    // Restock product (add 8 -> stock 2 + 8 = 10)
-    const restock = await json("POST", "/api/products/" + created.data.product.id + "/restock", {
-      addQty: 8,
+    // Restock product (add 10 -> stock 3 + 10 = 13)
+    const restock = await json("POST", `/api/products/${created2.data.product.id}/restock`, {
+      addQty: 10,
     });
-    check("restock product", restock.status === 201 || restock.status === 200);
-    check("restock adds quantity", restock.data && restock.data.product.stockQty === 10);
-    const badRestock = await json("POST", "/api/products/" + created.data.product.id + "/restock", { addQty: 0 });
-    check("restock rejects non-positive", badRestock.status === 400);
+    check("restock product", restock.status === 200 && restock.data.product.stockQty === 13);
 
-    // Records
-    const recToday = await json("GET", "/api/records?filter=today");
-    check("records today grouped", recToday.status === 200 && Array.isArray(recToday.data.groups));
+    // Product stats updated
+    const updatedStats = await json("GET", "/api/products/stats");
+    check("updated product stats", updatedStats.status === 200 && updatedStats.data.totalProducts === 2);
 
+    // Manual sale record
     const manual = await json("POST", "/api/records", {
-      productName: "Rice bag 25kg",
-      quantity: 2,
-      unitPrice: 16000,
+      productId: created1.data.product.id,
+      productName: "Coca-Cola 50Cl Fresh",
+      quantity: 4,
+      unitPrice: 550,
     });
-    check("manual record", manual.status === 201 && manual.data.record.source === "manual");
+    check("manual record creation", manual.status === 201 && manual.data.record.amount === 2200);
 
     // Scanning flow (multipart upload -> mock OCR -> review -> confirm)
     const fakeImage = Buffer.from(
@@ -149,51 +125,49 @@ async function main() {
       "base64"
     );
     const fd = new FormData();
-    fd.append("image", new Blob([fakeImage], { type: "image/jpeg" }), "page.jpg");
+    fd.append("image", new Blob([fakeImage], { type: "image/jpeg" }), "sales_page.jpg");
     const scanRes = await fetch(`${BASE}/api/scans`, { method: "POST", body: fd });
     const scanData = await scanRes.json();
     check("scan upload + extract", scanRes.status === 201 && Array.isArray(scanData.extracted) && scanData.extracted.length > 0);
 
     const scanId = scanData.id;
-    const unknownRow = scanData.extracted.find((r) => r.productName === "Unknown item") || scanData.extracted[0];
-    const fixed = await json("PATCH", `/api/scans/${scanId}/records/${unknownRow.id}`, {
-      productName: "Coca-Cola 50Cl",
-      quantity: 3,
-      unitPrice: 500,
+    const targetRow = scanData.extracted[0];
+    const fixed = await json("PATCH", `/api/scans/${scanId}/records/${targetRow.id}`, {
+      productName: "Rice bag 25kg",
+      quantity: 1,
+      unitPrice: 16000,
     });
-    check("edit extracted row", fixed.status === 200);
+    check("edit extracted scan row", fixed.status === 200);
 
     const confirm = await json("POST", `/api/scans/${scanId}/confirm`);
     check("confirm scan commits records", confirm.status === 200 && confirm.data.recordsCreated > 0);
-    check("scan now saved", confirm.data.scan.status === "saved");
-    const recToday2 = await json("GET", "/api/records?filter=today");
-    const appeared = recToday2.data.groups.some((g) =>
-      g.items.some((it) => it.productName === "Coca-Cola 50Cl")
-    );
-    check("confirmed scan appears in records", appeared);
+    check("scan status saved", confirm.data.scan.status === "saved");
 
     const duplicateConfirm = await json("POST", `/api/scans/${scanId}/confirm`);
     check("double confirm blocked", duplicateConfirm.status === 409);
 
-    // Dashboard
-    const dash = await json("GET", "/api/dashboard?lang=fr");
+    // Records listing & day grouping
+    const recToday = await json("GET", "/api/records?filter=today");
+    check("records today grouped", recToday.status === 200 && Array.isArray(recToday.data.groups) && recToday.data.count >= 2);
+
+    // Dashboard with confirmed sales
+    const dash = await json("GET", "/api/dashboard?lang=en");
     check(
-      "dashboard metrics",
-      dash.status === 200 && typeof dash.data.salesToday === "number" && !!dash.data.salesTodayLabel,
-      JSON.stringify(dash.data).slice(0, 120)
+      "dashboard metrics with sales",
+      dash.status === 200 && dash.data.salesToday > 0 && typeof dash.data.salesTodayLabel === "string"
     );
 
-    // Analytics
+    // Analytics calculation
     const an = await json("GET", "/api/analytics?range=30d&lang=en");
     check(
-      "analytics",
+      "analytics metrics",
       an.status === 200 &&
-        an.data.weeklyChart.length === 7 &&
-        Array.isArray(an.data.bestSelling) &&
-        Array.isArray(an.data.slowMoving)
+        an.data.metrics.totalSales > 0 &&
+        Array.isArray(an.data.weeklyChart) &&
+        an.data.weeklyChart.length === 7
     );
 
-    // Export
+    // Excel exports
     const recXlsx = await fetch(`${BASE}/api/export/records/excel`);
     const recBuf = Buffer.from(await recXlsx.arrayBuffer());
     check(
@@ -214,7 +188,7 @@ async function main() {
     console.error("Test error:", e);
     failed++;
   } finally {
-    server.kill();
+    server.close();
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

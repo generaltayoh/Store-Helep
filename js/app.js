@@ -100,7 +100,7 @@ const I18N = {
 
     "setup.selected": "Selected", "setup.failed": "Setup failed",
     "setup.title": "Set up your shop", "setup.bizName": "Business name",
-    "setup.bizEmail": "Business email", "setup.bizType": "Business type",
+    "setup.bizPhone": "Business phone", "setup.bizType": "Business type",
     "setup.currency": "Currency", "setup.location": "Location", "setup.continue": "Continue",
     "type.grocery": "Grocery / Mini-market", "type.provision": "Provision store",
     "type.bakery": "Bread & Bakery", "type.butchery": "Butchery / Meat shop",
@@ -119,7 +119,7 @@ const I18N = {
     "record.title": "How do you record your business today?",
     "record.lede": "This helps us set things up the way you already work.",
     "method.notebook": "Notebook", "method.receipts": "Receipts", "method.spreadsheet": "Spreadsheet",
-    "method.recNote": "Recommended — we'll help you scan it.",
+    "method.recNote": "Recommended.",
     "scanw.title": "How scanning works",
     "scanw.s1": "Take a photo of your page", "scanw.s1d": "Just like a normal photo — lay the notebook flat and snap it.",
     "scanw.s2": "We read the records", "scanw.s2d": "Our AI reads dates, products, quantities and prices from the page.",
@@ -142,11 +142,11 @@ const I18N = {
     "camera.scanNow": "SCAN NOW",
     "camera.retake": "Retake",
     "camera.noPhotos": "No pages captured yet.",
-    "biz.title": "Business info", "biz.name": "Business name", "biz.email": "Business email",
+    "biz.title": "Business info", "biz.name": "Business name",     "biz.phone": "Business phone",
     "biz.type": "Business type", "biz.currency": "Currency", "biz.location": "Location",
     "biz.fCFA": "FCFA — Central African Franc", "biz.xaf": "XAF — Central African CFA",
     "biz.saved": "Business info saved", "biz.saveChanges": "Save changes",
-    "biz.cannotChange": "Cannot be changed", "biz.optional": "optional",
+    "biz.cannotChange": "Cannot be changed",     "biz.optional": "(optional)",
   },
   fr: {
     "nav.home": "Accueil", "nav.records": "Registres", "nav.scan": "Scanner",
@@ -234,7 +234,7 @@ const I18N = {
 
     "setup.selected": "Sélectionné", "setup.failed": "Échec de la configuration",
     "setup.title": "Configurez votre boutique", "setup.bizName": "Nom de l'entreprise",
-    "setup.bizEmail": "Email de l'entreprise", "setup.bizType": "Type d'entreprise",
+    "setup.bizPhone": "Téléphone de l'entreprise", "setup.bizType": "Type d'entreprise",
     "setup.currency": "Devise", "setup.location": "Emplacement", "setup.continue": "Continuer",
     "type.grocery": "Épicerie / Mini-marché", "type.provision": "Magasin de provisions",
     "type.bakery": "Boulangerie", "type.butchery": "Boucherie / Boucherie",
@@ -276,11 +276,11 @@ const I18N = {
     "camera.scanNow": "SCAN MAINTENANT",
     "camera.retake": "Refaire",
     "camera.noPhotos": "Aucune page capturée pour l'instant.",
-    "biz.title": "Infos entreprise", "biz.name": "Nom de l'entreprise", "biz.email": "Email de l'entreprise",
+    "biz.title": "Infos entreprise", "biz.name": "Nom de l'entreprise",     "biz.phone": "Téléphone de l'entreprise",
     "biz.type": "Type d'entreprise", "biz.currency": "Devise", "biz.location": "Emplacement",
     "biz.fCFA": "FCFA — Franc CFA d'Afrique centrale", "biz.xaf": "XAF — CFA d'Afrique centrale",
     "biz.saved": "Infos entreprise enregistrées", "biz.saveChanges": "Enregistrer les modifications",
-    "biz.cannotChange": "Ne peut pas être modifié", "biz.optional": "facultatif",
+    "biz.cannotChange": "Ne peut pas être modifié",     "biz.optional": "(facultatif)",
   },
 };
 
@@ -344,6 +344,20 @@ const state = {
     localStorage.setItem("sh_method", m);
   },
 };
+
+function getSavedAccounts() {
+  try {
+    return JSON.parse(localStorage.getItem("sh_accounts") || "[]");
+  } catch {
+    return [];
+  }
+}
+function saveAccount(account) {
+  const accounts = getSavedAccounts();
+  const existing = accounts.find((a) => a.phone === account.phone && a.name === account.name);
+  if (!existing) accounts.push(account);
+  localStorage.setItem("sh_accounts", JSON.stringify(accounts));
+}
 
 async function api(path, { method = "GET", body, auth = true } = {}) {
   const headers = {};
@@ -441,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.appendChild(overlay);
     setTimeout(() => {
       window.location.href = target;
-    }, 1500);
+    }, 0);
   }
 
   /* ---- Dashboard loading overlay (only after login / camera permission) ---- */
@@ -584,7 +598,6 @@ function initCamera() {
   const gate = document.getElementById("camGate");
   const enableBtn = document.getElementById("enableCamBtn");
   const shutterBtn = document.getElementById("shutterBtn");
-  const pageCount = document.getElementById("pageCount");
   const flashBtn = document.getElementById("flashBtn");
   const reviewBtn = document.getElementById("reviewBtn");
   const reviewClose = document.getElementById("reviewClose");
@@ -596,6 +609,14 @@ function initCamera() {
   let pages = [];
   let retakeIndex = null;
   let torchOn = false;
+
+  function updateReviewBtn() {
+    if (!reviewBtn) return;
+    reviewBtn.disabled = pages.length === 0;
+    reviewBtn.style.opacity = pages.length === 0 ? "0.4" : "1";
+  }
+
+  updateReviewBtn();
 
   function showGateMessage(msg) {
     if (gate) gate.classList.remove("hidden");
@@ -655,21 +676,33 @@ function initCamera() {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const data = canvas.toDataURL("image/jpeg", 0.85);
+      const wasRetake = retakeIndex !== null;
       if (retakeIndex !== null) {
         pages[retakeIndex] = data;
         retakeIndex = null;
       } else {
         pages.push(data);
       }
+      const pageCount = document.getElementById("pageCount");
       if (pageCount) pageCount.textContent = String(pages.length);
-      toast(t("camera.captured"));
+      updateReviewBtn();
+      toast(wasRetake ? "Picture retaken" : t("camera.captured"));
+      if (wasRetake) {
+        showReview(true);
+        renderThumbGrid();
+      }
     });
   }
 
   function showReview(on) {
     if (camReview) camReview.hidden = !on;
     if (camView) camView.hidden = on;
-    if (on) renderThumbGrid();
+    const spacer = document.querySelector(".cam-spacer");
+    if (spacer) spacer.style.display = on ? "block" : "none";
+    if (on) {
+      renderThumbGrid();
+      setTimeout(() => camReview.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    }
   }
 
   function renderThumbGrid() {
@@ -694,19 +727,34 @@ function initCamera() {
 
   if (thumbGrid) {
     thumbGrid.addEventListener("click", (e) => {
+      const img = e.target.closest(".thumb-item img");
+      if (img) {
+        const overlay = document.getElementById("enlargeOverlay");
+        const enlargeImg = document.getElementById("enlargeImg");
+        if (overlay && enlargeImg) {
+          enlargeImg.src = img.src;
+          overlay.style.display = "flex";
+        }
+        return;
+      }
       const x = e.target.closest(".thumb-x");
       const rt = e.target.closest(".thumb-retake");
       if (x) {
         const i = Number(x.dataset.i);
         pages.splice(i, 1);
         renderThumbGrid();
+        const pageCount = document.getElementById("pageCount");
         if (pageCount) pageCount.textContent = String(pages.length);
+        updateReviewBtn();
       } else if (rt) {
         const i = Number(rt.dataset.i);
         retakeIndex = i;
-        pages.splice(i, 1);
-        if (pageCount) pageCount.textContent = String(pages.length);
         showReview(false);
+        // Show camera view for retake
+        if (camView) camView.hidden = false;
+        if (camReview) camReview.hidden = true;
+        // Restart camera stream if not active
+        if (!stream) startCamera();
       }
     });
   }
@@ -738,30 +786,120 @@ function initCamera() {
     });
   }
 
-  // Auto-open if permission was already granted
+  // Check saved camera permission from registration/setup
+  const savedCamPerm = localStorage.getItem("sh_camera_permission");
+
+  // Auto-open camera if previously granted; otherwise show gate
   (async () => {
-    let state = "prompt";
-    try {
-      if (navigator.permissions && navigator.permissions.query) {
-        const ps = await navigator.permissions.query({ name: "camera" });
-        state = ps.state;
+    if (savedCamPerm === "granted" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      startCamera();
+    } else {
+      let state = "prompt";
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const ps = await navigator.permissions.query({ name: "camera" });
+          state = ps.state;
+        }
+      } catch (_) { /* ignore */ }
+      if (state === "granted") {
+        localStorage.setItem("sh_camera_permission", "granted");
+        startCamera();
+      } else {
+        // Gate remains visible; user must click enable
       }
-    } catch (_) { /* ignore */ }
-    if (state === "granted") startCamera();
+    }
   })();
 }
 
 /* ---------------- Onboarding ---------------- */
 function initLogin() {
+  // Populate saved accounts dropdown
+  const savedSelect = document.getElementById("savedAccount");
+  if (savedSelect) {
+    const accounts = getSavedAccounts();
+    accounts.forEach((a) => {
+      const opt = document.createElement("option");
+      opt.value = JSON.stringify({ name: a.name, phone: a.phone });
+      opt.textContent = `${a.name} (${a.phone})`;
+      savedSelect.appendChild(opt);
+    });
+    savedSelect.addEventListener("change", () => {
+      try {
+        const val = JSON.parse(savedSelect.value);
+        if (val && val.name) document.getElementById("loginName").value = val.name;
+        if (val && val.phone) document.getElementById("loginPhone").value = val.phone;
+      } catch {}
+    });
+  }
+
+  const nameInput = document.getElementById("loginName");
+  const phoneInput = document.getElementById("loginPhone");
+
+  function showAccountDropdown(anchor) {
+    // Remove existing dropdown
+    const existing = document.getElementById("savedAccountPopup");
+    if (existing) existing.remove();
+    const accounts = getSavedAccounts();
+    if (!accounts.length) return;
+    const popup = document.createElement("div");
+    popup.id = "savedAccountPopup";
+    popup.style.cssText = "position:absolute;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:280px;width:100%;margin-top:4px;padding:4px 0;";
+    accounts.forEach((a) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.style.cssText = "width:100%;text-align:left;padding:8px 12px;background:none;border:none;cursor:pointer;font:inherit;color:#1f3d2b;";
+      item.textContent = `${a.name} (${a.phone})`;
+      item.addEventListener("click", () => {
+        const loginName = document.getElementById("loginName");
+        const loginPhone = document.getElementById("loginPhone");
+        const bizName = document.getElementById("bizName");
+        const bizPhone = document.getElementById("bizPhone");
+        if (loginName) loginName.value = a.name;
+        if (loginPhone) loginPhone.value = a.phone;
+        if (bizName) bizName.value = a.name;
+        if (bizPhone) bizPhone.value = a.phone;
+        popup.remove();
+      });
+      item.addEventListener("mouseenter", () => item.style.background = "#f0f4f2");
+      item.addEventListener("mouseleave", () => item.style.background = "none");
+      popup.appendChild(item);
+    });
+    // Position near anchor
+    const rect = anchor.getBoundingClientRect();
+    popup.style.left = rect.left + "px";
+    popup.style.top = (rect.bottom + window.scrollY + 4) + "px";
+    document.body.appendChild(popup);
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener("click", (e) => {
+        const loginName = document.getElementById("loginName");
+        const loginPhone = document.getElementById("loginPhone");
+        const bizName = document.getElementById("bizName");
+        const bizPhone = document.getElementById("bizPhone");
+        const targets = [loginName, loginPhone, bizName, bizPhone, anchor].filter(Boolean);
+        if (!popup.contains(e.target) && !targets.includes(e.target)) popup.remove();
+      }, { once: true });
+    }, 10);
+  }
+
+  [nameInput, phoneInput].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showAccountDropdown(el);
+    });
+  });
+
   const form = document.querySelector('form.login-form[data-next^="dashboard"]');
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = document.getElementById("loginName").value.trim();
-    const email = document.getElementById("loginEmail").value.trim();
+    const phone = document.getElementById("loginPhone").value.trim();
     try {
-      const data = await api("/auth/login", { method: "POST", body: { businessName: name, businessEmail: email } });
+      const data = await api("/auth/login", { method: "POST", body: { businessName: name, businessPhone: phone } });
       state.token = data.token;
       state.business = data.business;
+      saveAccount({ name, phone, type: data.business?.type || "Grocery / Mini-market" });
       window.location.href = "dashboard.html?welcome=1";
     } catch (err) {
       toast(err.message || t("common.loginFailed"), "error");
@@ -772,20 +910,42 @@ function initLogin() {
 function initSetup() {
   wireSelectField("bizType", "bizTypeOptions");
 
+  // Populate saved accounts dropdown
+  const nameInputSetup = document.getElementById("bizName");
+  const phoneInputSetup = document.getElementById("bizPhone");
+
+  [nameInputSetup, phoneInputSetup].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showAccountDropdown(el);
+    });
+  });
+
   const form = document.querySelector('form.login-form[data-next^="how-scanning"]');
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = document.getElementById("bizName").value.trim();
-    const email = document.getElementById("bizEmail").value.trim();
+    const phone = document.getElementById("bizPhone").value.trim();
     const type = (document.querySelector("#bizType") || {}).dataset?.value || "Grocery / Mini-market";
     const currency = (document.querySelector("#bizCurrency") || {}).dataset?.value || "FCFA";
     const location = document.getElementById("bizLocation").value.trim();
     try {
       const data = await api("/auth/setup", {
         method: "POST",
-        body: { name, email, type, currency, location, recordMethod: state.recordMethod },
+        body: { name, phone, type, currency, location, recordMethod: state.recordMethod },
       });
       state.business = data.business;
+      saveAccount({ name, phone, type: type || data.business?.type || "Grocery / Mini-market" });
+      // Request camera permission during registration if supported
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const ps = await navigator.permissions.query({ name: "camera" });
+          localStorage.setItem("sh_camera_permission", ps.state);
+        } catch (e) {
+          // Ignore permission errors (e.g. not supported by browser)
+        }
+      }
       window.location.href = "how-scanning-works.html";
     } catch (err) {
       toast(err.message || t("setup.failed"), "error");
@@ -808,10 +968,10 @@ async function initBusinessInfo() {
   }
   if (biz) {
     const nameEl = document.getElementById("bizName");
-    const emailEl = document.getElementById("bizEmail");
+    const phoneEl = document.getElementById("bizPhone");
     const locEl = document.getElementById("bizLocation");
     if (nameEl) nameEl.value = biz.name || "";
-    if (emailEl) emailEl.value = biz.email || "";
+    if (phoneEl) phoneEl.value = biz.email || "";
     if (locEl) locEl.value = biz.location || "";
 
     const typeBtn = document.getElementById("bizType");
@@ -869,6 +1029,18 @@ async function initBusinessInfo() {
 /* ---------------- Dashboard ---------------- */
 async function initDashboard() {
   try {
+    if (!state.business) {
+      try {
+        const bRes = await api("/business");
+        if (bRes && bRes.business) {
+          state.business = bRes.business;
+        }
+      } catch {}
+    }
+
+    const biz = document.querySelector(".dash-top .biz");
+    if (biz) biz.textContent = state.business ? state.business.name : "My Store";
+
     const data = await api(`/dashboard?lang=${getLang()}`);
     const set = (sel, val) => {
       const el = document.querySelector(sel);
@@ -882,9 +1054,6 @@ async function initDashboard() {
     if (cards[0]) cards[0].textContent = data.estimatedProfitLabel;
     if (cards[1]) cards[1].textContent = `${fmt(data.unitsSold)} ${t("common.units")}`;
     if (cards[2]) cards[2].textContent = `${data.lowStockCount} ${t("common.items")}`;
-
-    const biz = document.querySelector(".dash-top .biz");
-    if (biz && state.business) biz.textContent = state.business.name;
 
     const dateEl = document.querySelector(".dash-top .date");
     if (dateEl) {
@@ -1117,16 +1286,32 @@ async function loadRecords(filter = "today", from = "", to = "") {
     return;
   }
   groups.forEach((g) => {
-    const html = `<h2 class="day-label">${g.label}</h2><div class="record-list">${g.items
-      .map(
-        (r) => `<div class="card record-card">
+    // Group items by scan session (batch)
+    const batches = {};
+    g.items.forEach((r) => {
+      const key = r.scanId || "manual_" + r.productName + "_" + r.time;
+      if (!batches[key]) batches[key] = { items: [], label: r.scanId ? "Scan batch" : "Manual", total: 0, count: 0 };
+      batches[key].items.push(r);
+      batches[key].total += Number(r.amount || 0);
+      batches[key].count += 1;
+    });
+    const batchCards = Object.values(batches).map((b) => {
+      const label = b.items[0].scanId ? (b.items[0].scanId ? "Scan session" : "Manual") : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
+      return `<div class="card record-batch" onclick="this.nextElementSibling?.classList.toggle('hidden')" style="cursor:pointer">
+        <span class="avatar green">${initials(b.items[0].productName)}</span>
+        <span class="mid"><b>${label}</b><span>${b.count} items · ${fcfan(b.total)}</span></span>
+        <span class="right"><span class="chev">›</span></span>
+      </div>
+      <div class="batch-detail hidden" style="padding-left:16px;padding-bottom:8px">${b.items.map(
+        (r) => `<div class="card record-card" style="margin-top:4px;margin-bottom:4px">
           <span class="avatar ${r.source === "manual" ? "gray" : "green"}">${initials(r.productName)}</span>
           <span class="mid"><b>${escapeHtml(r.productName)} × ${r.quantity}</b><span>${r.time}</span></span>
           <span class="right"><b>${fcfan(r.amount)}</b>
             <span class="badge ${sourceClass(r.source)}">${sourceLabel(r.source)}</span></span>
         </div>`
-      )
-      .join("")}</div>`;
+      ).join("")}</div>`;
+    }).join("");
+    const html = `<h2 class="day-label">${g.label}</h2>` + batchCards;
     chips.insertAdjacentHTML("afterend", html);
   });
 }

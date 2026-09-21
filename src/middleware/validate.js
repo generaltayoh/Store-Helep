@@ -15,3 +15,8 @@ export function requiredBody(fields) {
 export function isEmail(value) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
+
+export function isPhone(value) {
+  // Cameroonian standard: +237 6/7/8/9 followed by 8 digits, or 237/6/7/8/9 with digits
+  return typeof value === "string" && /^(\+237|237)?[6789]\d{8}$/.test(value.replace(/\s/g, ""));
+}

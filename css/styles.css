@@ -722,8 +722,10 @@ img, svg { display: block; }
   padding: 22px 20px 26px;
   display: flex;
   flex-direction: column;
+  min-height: 100dvh;
 }
 .cam-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.cam-title { color: #fff; font-weight: 700; font-size: 16px; letter-spacing: .3px; }
 .cam-btn {
   width: 42px;
   height: 42px;
@@ -747,7 +749,8 @@ img, svg { display: block; }
 }
 .viewfinder {
   position: relative;
-  height: 380px;
+  flex: 1;
+  min-height: 380px;
   border: 1.5px solid var(--amber);
   border-radius: 4px;
 }
@@ -834,7 +837,7 @@ img, svg { display: block; }
   transition: transform .1s ease;
 }
 .shutter:active { transform: scale(.92); }
-.cam-spacer { flex: 1; background: var(--paper); min-height: 220px; }
+.cam-spacer { flex: 1; background: var(--paper); min-height: 220px; display: none; }
 
 /* ============ CAMERA REVIEW ============ */
 .cam-review { padding: 22px 20px 26px; background: var(--paper); min-height: 100dvh; }
@@ -939,6 +942,7 @@ img, svg { display: block; }
 .product-card .mid { flex: 1; min-width: 0; }
 .product-card .mid b { display: block; font-size: 14px; font-weight: 700; }
 .product-card .mid span { font-size: 12px; color: var(--ink-faint); }
+.record-list .txt { display: flex; align-items: center; justify-content: center; padding: 16px; font-weight: 500; color: var(--ink-soft); text-align: center; }
 .product-card .right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .product-card .right b { font-size: 14px; font-weight: 700; }
 .prod-actions { display: flex; gap: 6px; margin-top: 6px; }

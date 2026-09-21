@@ -2,7 +2,8 @@ import ExcelJS from "exceljs";
 import { db } from "../data/store.js";
 import { resolveRange } from "../services/analyticsService.js";
 import { withStatus } from "../services/inventoryService.js";
-import { config } from "../config/index.js";
+import { isSupabaseConfigured } from "../config/supabase.js";
+import { supabaseService } from "../services/supabaseService.js";
 
 function filterRecordsForExport(filter, from, to) {
   switch (filter) {
@@ -32,9 +33,15 @@ function sendWorkbook(res, workbook, fileName) {
 export async function exportRecords(req, res, next) {
   try {
     const { filter = "all", from, to } = req.query;
-    const records = filterRecordsForExport(filter, from, to).sort(
-      (a, b) => b.timestamp - a.timestamp
-    );
+    let records = [];
+
+    if (isSupabaseConfigured()) {
+      records = await supabaseService.listRecords({ filter, from, to });
+    } else {
+      records = filterRecordsForExport(filter, from, to).sort(
+        (a, b) => b.timestamp - a.timestamp
+      );
+    }
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "Store Helep";
@@ -75,10 +82,17 @@ export async function exportRecords(req, res, next) {
 export async function exportProducts(req, res, next) {
   try {
     const { category, stockStatus } = req.query;
-    let products = db.products;
-    if (category) products = products.filter((p) => p.category === category);
-    if (stockStatus && stockStatus !== "all") {
-      products = products.filter((p) => withStatus(p).stockStatus === stockStatus);
+    let products = [];
+
+    if (isSupabaseConfigured()) {
+      products = await supabaseService.listProducts({ category, stockStatus });
+    } else {
+      products = db.products;
+      if (category) products = products.filter((p) => p.category === category);
+      if (stockStatus && stockStatus !== "all") {
+        products = products.filter((p) => withStatus(p).stockStatus === stockStatus);
+      }
+      products = products.map((p) => withStatus(p));
     }
 
     const wb = new ExcelJS.Workbook();
@@ -94,7 +108,6 @@ export async function exportProducts(req, res, next) {
     ];
 
     for (const p of products) {
-      const s = withStatus(p);
       ws.addRow({
         sku: p.sku,
         name: p.name,
@@ -102,7 +115,7 @@ export async function exportProducts(req, res, next) {
         unitPrice: p.unitPrice,
         stockQty: p.stockQty,
         stockValue: p.unitPrice * p.stockQty,
-        status: s.stockStatus,
+        status: p.stockStatus,
       });
     }
 
