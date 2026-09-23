@@ -135,7 +135,7 @@ const I18N = {
     "camera.denied": "Camera access is blocked. Enable it in your browser settings.",
     "camera.none": "No camera was found on this device.",
     "camera.error": "We couldn't start the camera. Check permissions or try another browser.",
-    "camera.flashUnsupported": "Flash is not supported on this device."
+    "camera.flashUnsupported": "Flash is not supported on this device.",
     "camera.captured": "Page captured",
     "camera.title": "Scanner",
     "camera.reviewTitle": "Review pages",
