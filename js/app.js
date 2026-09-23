@@ -675,7 +675,6 @@ function initCamera() {
       () => track.applyConstraints({ torch: torchOn }),
       () => track.applyConstraints({ advanced: [{ torch: torchOn, facingMode: { ideal: "environment" } }] }),
     ];
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
     let success = false;
     for (const m of methods) {
       try {
