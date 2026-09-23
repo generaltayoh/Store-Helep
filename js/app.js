@@ -663,6 +663,7 @@ function initCamera() {
       () => track.applyConstraints({ torch: torchOn }),
       () => track.applyConstraints({ advanced: [{ torch: torchOn, facingMode: { ideal: "environment" } }] }),
     ];
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
     let success = false;
     for (const m of methods) {
       try {
@@ -685,7 +686,7 @@ function initCamera() {
       if (flashBtn) flashBtn.classList.toggle("active", torchOn);
     } else {
       torchOn = !torchOn;
-      toast(t("camera.flashUnsupported"), "error");
+      if (!isMobile) toast(t("camera.flashUnsupported"), "error");
     }
   }
 
