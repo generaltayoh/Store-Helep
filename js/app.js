@@ -771,6 +771,11 @@ function initCamera() {
         const pageCount = document.getElementById("pageCount");
         if (pageCount) pageCount.textContent = String(pages.length);
         updateReviewBtn();
+        if (pages.length === 0) {
+          showReview(false);
+          if (camView) camView.hidden = false;
+          if (camReview) camReview.hidden = true;
+        }
       } else if (rt) {
         const i = Number(rt.dataset.i);
         retakeIndex = i;
