@@ -134,7 +134,8 @@ const I18N = {
     "camera.unsupported": "Camera isn't supported on this device.",
     "camera.denied": "Camera access is blocked. Enable it in your browser settings.",
     "camera.none": "No camera was found on this device.",
-    "camera.error": "We couldn't start the camera.",
+    "camera.error": "We couldn't start the camera. Check permissions or try another browser.",
+    "camera.flashUnsupported": "Flash is not supported on this device."
     "camera.captured": "Page captured",
     "camera.title": "Scanner",
     "camera.reviewTitle": "Review pages",
@@ -268,7 +269,8 @@ const I18N = {
     "camera.unsupported": "La caméra n'est pas prise en charge sur cet appareil.",
     "camera.denied": "L'accès à la caméra est bloqué. Activez-le dans les paramètres du navigateur.",
     "camera.none": "Aucune caméra trouvée sur cet appareil.",
-    "camera.error": "Impossible de démarrer la caméra.",
+    "camera.error": "Impossible de démarrer la caméra. Vérifiez les autorisations ou essayez un autre navigateur.",
+    "camera.flashUnsupported": "Le flash n'est pas pris en charge sur cet appareil.",
     "camera.captured": "Page capturée",
     "camera.title": "Scanner",
     "camera.reviewTitle": "Vérifier les pages",
@@ -654,13 +656,23 @@ function initCamera() {
     if (!stream) { startCamera(); return; }
     const track = stream.getVideoTracks()[0];
     if (!track) return;
+    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+    if (!capabilities.torch) {
+      toast(t("camera.flashUnsupported"), "error");
+      return;
+    }
     torchOn = !torchOn;
     try {
       await track.applyConstraints({ advanced: [{ torch: torchOn }] });
       if (flashBtn) flashBtn.classList.toggle("active", torchOn);
     } catch (e) {
-      torchOn = !torchOn;
-      toast(t("camera.flashUnsupported"), "error");
+      try {
+        await track.applyConstraints({ torch: torchOn });
+        if (flashBtn) flashBtn.classList.toggle("active", torchOn);
+      } catch (e2) {
+        torchOn = !torchOn;
+        toast(t("camera.flashUnsupported"), "error");
+      }
     }
   }
 
@@ -928,7 +940,7 @@ function initSetup() {
     const name = document.getElementById("bizName").value.trim();
     const phone = document.getElementById("bizPhone").value.trim();
     const type = (document.querySelector("#bizType") || {}).dataset?.value || "Grocery / Mini-market";
-    const currency = (document.querySelector("#bizCurrency") || {}).dataset?.value || "FCFA";
+    const currency = "FCFA";
     const location = document.getElementById("bizLocation").value.trim();
     try {
       const data = await api("/auth/setup", {
@@ -956,7 +968,7 @@ function initSetup() {
 /* ---------------- Business Info (view/edit) ---------------- */
 async function initBusinessInfo() {
   wireSelectField("bizType", "bizTypeOptions");
-  wireSelectField("bizCurrency", "bizCurrencyOptions");
+  // wireSelectField("bizCurrency", "bizCurrencyOptions"); // hardcoded to FCFA
 
   let biz = state.business;
   if (!biz) {
@@ -1010,7 +1022,7 @@ async function initBusinessInfo() {
       const name = document.getElementById("bizName").value.trim();
       const location = document.getElementById("bizLocation").value.trim();
       const type = document.getElementById("bizType").dataset.value || "Grocery / Mini-market";
-      const currency = document.getElementById("bizCurrency").dataset.value || "FCFA";
+      const currency = "FCFA";
       try {
         const d = await api("/business", {
           method: "PATCH",

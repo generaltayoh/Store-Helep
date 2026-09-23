@@ -77,7 +77,7 @@ export async function setup(req, res, next) {
         name,
         email: phone,
         type,
-        currency,
+        currency: "FCFA",
         location,
         recordMethod,
         token: biz.token,
@@ -107,7 +107,7 @@ export async function setup(req, res, next) {
       name: name || db.business.name,
       email: phone || db.business.email,
       type: type || db.business.type || "Grocery / Mini-market",
-      currency: currency || db.business.currency || "FCFA",
+      currency: "FCFA",
       location: location !== undefined ? location : db.business.location || "",
       recordMethod: recordMethod || db.business.recordMethod || "Notebook",
     });

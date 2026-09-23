@@ -30,7 +30,7 @@ export async function updateBusiness(req, res, next) {
         name,
         email: phone,
         type,
-        currency,
+        currency: "FCFA",
         location,
         language: language !== undefined ? normalizeLang(language) : undefined,
         darkMode,
@@ -43,7 +43,7 @@ export async function updateBusiness(req, res, next) {
     if (name !== undefined) db.business.name = name;
     if (phone !== undefined) db.business.email = phone;
     if (type !== undefined) db.business.type = type;
-    if (currency !== undefined) db.business.currency = currency;
+    if (currency !== undefined) db.business.currency = "FCFA";
     if (location !== undefined) db.business.location = location;
     if (language !== undefined) db.settings.language = normalizeLang(language);
     if (darkMode !== undefined) db.settings.darkMode = Boolean(darkMode);
