@@ -656,23 +656,26 @@ function initCamera() {
     if (!stream) { startCamera(); return; }
     const track = stream.getVideoTracks()[0];
     if (!track) return;
-    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-    if (!capabilities.torch) {
-      toast(t("camera.flashUnsupported"), "error");
-      return;
-    }
     torchOn = !torchOn;
-    try {
-      await track.applyConstraints({ advanced: [{ torch: torchOn }] });
-      if (flashBtn) flashBtn.classList.toggle("active", torchOn);
-    } catch (e) {
+    const methods = [
+      () => track.applyConstraints({ advanced: [{ torch: torchOn, facingMode: "environment" }] }),
+      () => track.applyConstraints({ advanced: [{ torch: torchOn }] }),
+      () => track.applyConstraints({ torch: torchOn }),
+      () => track.applyConstraints({ advanced: [{ torch: torchOn, facingMode: { ideal: "environment" } }] }),
+    ];
+    let success = false;
+    for (const m of methods) {
       try {
-        await track.applyConstraints({ torch: torchOn });
-        if (flashBtn) flashBtn.classList.toggle("active", torchOn);
-      } catch (e2) {
-        torchOn = !torchOn;
-        toast(t("camera.flashUnsupported"), "error");
-      }
+        await m();
+        success = true;
+        break;
+      } catch (e) { /* try next */ }
+    }
+    if (success) {
+      if (flashBtn) flashBtn.classList.toggle("active", torchOn);
+    } else {
+      torchOn = !torchOn;
+      toast(t("camera.flashUnsupported"), "error");
     }
   }
 
