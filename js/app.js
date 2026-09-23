@@ -671,6 +671,16 @@ function initCamera() {
         break;
       } catch (e) { /* try next */ }
     }
+    // Samsung/Android fallback: restart stream with torch baked in
+    if (!success && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        stream.getTracks().forEach(t => t.stop());
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", torch: torchOn }, audio: false });
+        video.srcObject = stream;
+        await video.play();
+        success = true;
+      } catch (e) { /* ignore */ }
+    }
     if (success) {
       if (flashBtn) flashBtn.classList.toggle("active", torchOn);
     } else {
