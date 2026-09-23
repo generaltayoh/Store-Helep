@@ -657,6 +657,18 @@ function initCamera() {
     const track = stream.getVideoTracks()[0];
     if (!track) return;
     torchOn = !torchOn;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    // Direct camera flash access via ImageCapture (works on Samsung/Android native flash)
+    try {
+      if (window.ImageCapture) {
+        const imageCapture = new ImageCapture(track);
+        const mode = torchOn ? "flash" : "off";
+        await imageCapture.setOptions({ fillLightMode: mode });
+        if (flashBtn) flashBtn.classList.toggle("active", torchOn);
+        return;
+      }
+    } catch (e) { /* fall through */ }
+
     const methods = [
       () => track.applyConstraints({ advanced: [{ torch: torchOn, facingMode: "environment" }] }),
       () => track.applyConstraints({ advanced: [{ torch: torchOn }] }),
