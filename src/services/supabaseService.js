@@ -128,7 +128,8 @@ export const supabaseService = {
     const { data: biz, error } = await supabase
       .from("businesses")
       .select("*")
-      .or(`name.eq.${name},email.eq.${phone}`)
+      .eq("name", name)
+      .eq("email", phone)
       .maybeSingle();
     if (error) throw error;
     if (!biz) return null;

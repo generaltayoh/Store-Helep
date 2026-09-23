@@ -28,7 +28,6 @@ export async function login(req, res, next) {
         return res.status(401).json({ error: "Business not found. Check your name and phone number." });
       }
       const updated = await supabaseService.updateBusiness(biz.id, {
-        name: businessName,
         email: businessPhone,
         token,
       });
