@@ -14,7 +14,7 @@ export async function getProducts(req, res, next) {
     const { category, stockStatus } = req.query;
 
     if (isSupabaseConfigured()) {
-      const products = await supabaseService.listProducts({ category, stockStatus });
+      const products = await supabaseService.listProducts({ category, stockStatus, businessId: req.businessId });
       return res.json({ products, count: products.length });
     }
 

@@ -9,7 +9,7 @@ export async function getDashboard(req, res, next) {
     let data;
 
     if (isSupabaseConfigured()) {
-      data = await supabaseService.dashboard();
+      data = await supabaseService.dashboard(req.businessId);
     } else {
       data = dashboard();
     }

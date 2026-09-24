@@ -9,7 +9,7 @@ export async function getAnalytics(req, res, next) {
     let data;
 
     if (isSupabaseConfigured()) {
-      data = await supabaseService.analytics({ range, from, to, productId });
+      data = await supabaseService.analytics({ range, from, to, productId, businessId: req.businessId });
     } else {
       data = analytics({ range, from, to, productId });
     }

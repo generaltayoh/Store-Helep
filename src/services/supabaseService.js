@@ -99,16 +99,14 @@ export const supabaseService = {
   // --------------------------------------------------------------------------
   // Business & Settings
   // --------------------------------------------------------------------------
-  async getBusiness() {
+  async getBusiness(businessId) {
     const supabase = getSupabaseClient();
     if (!supabase) return null;
 
-    const { data: biz, error: bizErr } = await supabase
-      .from("businesses")
-      .select("*")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    let query = supabase.from("businesses").select("*");
+    if (businessId) query = query.eq("id", businessId);
+    else query = query.order("created_at", { ascending: true }).limit(1);
+    const { data: biz, error: bizErr } = await query.maybeSingle();
 
     if (bizErr) throw bizErr;
     if (!biz) return null;

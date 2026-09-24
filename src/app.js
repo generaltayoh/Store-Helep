@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import authRoutes from "./routes/auth.js";
+import { tokenAuth } from "./middleware/tokenAuth.js";
 import businessRoutes from "./routes/business.js";
 import scanRoutes from "./routes/scan.js";
 import recordRoutes from "./routes/record.js";
@@ -22,6 +23,7 @@ app.use(express.json());
 
 // API routes (mounted before static so they take precedence).
 app.use("/api/auth", authRoutes);
+app.use(tokenAuth);
 app.use("/api/business", businessRoutes);
 app.use("/api/scans", scanRoutes);
 app.use("/api/records", recordRoutes);
