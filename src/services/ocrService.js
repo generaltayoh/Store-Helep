@@ -82,7 +82,8 @@ function guessMime(fileName = "") {
 const OCR_SYSTEM_PROMPT = `You are an OCR engine for a small-store record-keeping app.
 The user records sales using the method: {record_method}.
 Given a photo of a handwritten or printed store record / sales page / delivery note,
-extract every line item into structured JSON.
+carefully and slowly read through the entire image. Examine every line, column, and entry.
+Only after fully analyzing the image should you produce the structured JSON.
 
 Respond ONLY with a JSON object of the form:
 {
