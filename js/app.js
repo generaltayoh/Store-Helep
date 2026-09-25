@@ -47,9 +47,9 @@ const I18N = {
     "prod.statLow": "Low stock", "prod.statOut": "Out of stock",
     "prod.noProducts": "No products found.",
     "prod.search": "Search products", "prod.noMatch": "No products match your search.",
-    "prod.sku": "SKU", "prod.inStock": "In stock", "prod.lowStock": "Low stock",
+    "prod.inStock": "In stock", "prod.lowStock": "Low stock",
     "prod.outOfStock": "Out of stock", "prod.addTitle": "Add product",
-    "prod.productName": "Product name", "prod.skuLabel": "SKU (e.g. CC-99)",
+    "prod.productName": "Product name", "prod.category": "Category",
     "prod.category": "Category", "prod.unitPrice": "Unit price (FCFA)",
     "prod.stockQty": "Stock quantity", "prod.added": "Product added",
     "prod.restock": "Restock", "prod.edit": "Edit",
@@ -1148,7 +1148,7 @@ let productSearch = "";
 function productCardHtml(p) {
   return `<div class="card product-card" data-id="${p.id}">
     <span class="avatar ${stockClass(p.stockStatus)}">${initials(p.name)}</span>
-    <span class="mid"><b>${escapeHtml(p.name)}</b><span>${t("prod.sku")} ${escapeHtml(p.sku)} · ${fcfan(p.unitPrice)}</span></span>
+    <span class="mid"><b>${escapeHtml(p.name)}</b><span>${fcfan(p.unitPrice)}</span></span>
     <span class="right"><b>${fmt(p.stockQty)}</b>
       <span class="badge ${stockClass(p.stockStatus)}">${labelFor(p.stockStatus)}</span>
       <span class="prod-actions">
@@ -1250,7 +1250,6 @@ async function initProducts() {
         submitLabel: t("common.add"),
         fields: [
           { name: "name", label: t("prod.productName"), required: true },
-          { name: "sku", label: t("prod.skuLabel"), required: true },
           {
             name: "category",
             label: t("prod.category"),
@@ -1275,7 +1274,6 @@ async function initProducts() {
               method: "POST",
               body: {
                 name: v.name,
-                sku: v.sku,
                 category: v.category,
                 unitPrice: v.unitPrice,
                 stockQty: v.stockQty,
@@ -1647,9 +1645,10 @@ async function loadScans() {
     const date = new Date(s.createdAt).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
     const badge = s.status === "saved" ? "green" : "amber";
     const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
+    const clickAttr = s.status === "needs_review" ? `onclick="openScanReview('${s.id}')" style="cursor:pointer;"` : "";
     heading.insertAdjacentHTML(
       "afterend",
-      `<div class="card prev-scan-card">
+      `<div class="card prev-scan-card" ${clickAttr}>
         <span class="thumb"></span>
         <span class="mid"><b>Page — ${date}</b><span>${s.recordCount} ${t("common.records")} · ${
         s.status === "saved" ? t("common.verified") : t("common.needsReviewLower")
@@ -1676,7 +1675,8 @@ async function loadHistory() {
         const my = d.toLocaleDateString(locale(), { month: "short", year: "numeric" });
         const badge = s.status === "saved" ? "green" : "amber";
         const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
-        return `<div class="card hist-row">
+        const clickAttr = s.status === "needs_review" ? `onclick="openScanReview('${s.id}')" style="cursor:pointer;"` : "";
+        return `<div class="card hist-row" ${clickAttr}>
           <span class="hist-date"><b>${day}</b><span>${my}</span></span>
           <span class="thumb"></span>
           <span class="mid"><b>${s.recordCount} ${t("common.records")}</b><span>${
@@ -1808,6 +1808,17 @@ function renderReview(scan) {
       toast(err.message || t("scan.confirmFailed"), "error");
     }
   });
+}
+
+async function openScanReview(scanId) {
+  try {
+    const scan = await api(`/scans/${scanId}`);
+    if (!scan || !scan.extracted) return;
+    renderReview(scan);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch (err) {
+    toast(err.message || "Failed to load scan review", "error");
+  }
 }
 
 /* ---------------- utils ---------------- */
