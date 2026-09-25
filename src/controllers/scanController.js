@@ -1,6 +1,7 @@
 import { db, nextId } from "../data/store.js";
 import { extractRecords } from "../services/ocrService.js";
 import { isSupabaseConfigured } from "../config/supabase.js";
+import { getSupabaseClient } from "../config/supabase.js";
 import { supabaseService } from "../services/supabaseService.js";
 
 function serializeScan(scan) {
@@ -133,7 +134,7 @@ export async function updateExtractedRow(req, res, next) {
 export async function deleteScan(req, res, next) {
   try {
     if (isSupabaseConfigured()) {
-      const supabase = require("../config/supabase.js").getSupabaseClient();
+      const supabase = getSupabaseClient();
       if (supabase) {
         const { error: delErr } = await supabase.from("scans").delete().eq("id", req.params.id);
         if (delErr) throw delErr;
