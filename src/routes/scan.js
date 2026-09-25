@@ -7,6 +7,7 @@ import {
   getScan,
   updateExtractedRow,
   confirmScan,
+  deleteScan,
 } from "../controllers/scanController.js";
 
 const router = Router();
@@ -19,5 +20,6 @@ router.get("/", asyncHandler(listScans));
 router.get("/:id", asyncHandler(getScan));
 router.patch("/:id/records/:rid", asyncHandler(updateExtractedRow));
 router.post("/:id/confirm", asyncHandler(confirmScan));
+router.delete("/:id", asyncHandler(deleteScan));
 
 export default router;
