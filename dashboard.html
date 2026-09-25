@@ -16,7 +16,10 @@
     <header class="dash-top">
       <div>
         <div class="biz">Business name</div>
-        <div class="date" id="todayDate">today</div>
+        <div class="date" id="todayDate"></div>
+        <script>
+          document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-CM', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toLowerCase();
+        </script>
       </div>
       <div class="menu-wrap">
         <button class="hamburger" id="hamburgerBtn" aria-label="Menu">
