@@ -1755,6 +1755,8 @@ function renderReview(scan) {
     panel.className = "card";
     panel.style.cssText = "margin-top:18px;padding:16px;";
     document.querySelector(".scan-page").appendChild(panel);
+  } else {
+    panel.innerHTML = ""; // Clear previous content so new scan replaces old table
   }
   panel.scrollIntoView({ behavior: "smooth" });
 
@@ -1781,9 +1783,15 @@ function renderReview(scan) {
   });
 
   const cancelBtn = panel.querySelector("#cancelScanBtn");
-  cancelBtn.addEventListener("click", () => {
+  cancelBtn.addEventListener("click", async () => {
+    try {
+      await api(`/scans/${scan.id}`, { method: "DELETE" });
+    } catch (e) {
+      // Ignore delete errors; just hide locally.
+    }
     panel.remove();
     setScanStatus("hidden");
+    loadScans().catch(console.error);
   });
 
   const confirmBtn = panel.querySelector("#confirmScanBtn");
@@ -1822,7 +1830,6 @@ async function openScanReview(scanId) {
     const scan = await api(`/scans/${scanId}`);
     if (!scan || !scan.extracted) return;
     renderReview(scan);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     toast(err.message || "Failed to load scan review", "error");
   }
