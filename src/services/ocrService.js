@@ -96,8 +96,10 @@ Rules:
 - quantity: units on that line (default 1 if not written).
 - unitPrice: price per unit in the currency shown on the page (number only, no symbols).
 - date: the record date if visible, else today's date "YYYY-MM-DD".
-- Omit rows you cannot read; do not invent items.
-- Return an empty records array if the image has no readable items.`;
+- Extract EVERY visible line/item. Do NOT skip items just because handwriting is unclear — read as much as possible and include it.
+- Only omit a row if it is completely unreadable; prefer including partial reads over dropping them.
+- Do not invent products that are not visible on the page.
+- Return an empty records array ONLY if the image has absolutely no readable items.`;
 
 async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") {
   if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) return null;
