@@ -121,7 +121,7 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
           ],
         },
       ],
-      generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
+      generationConfig: { temperature: 0.4, responseMimeType: "application/json" },
     };
     const res = await fetch(config.ai.endpoint, {
       method: "POST",
@@ -151,7 +151,7 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
   // OpenAI-compatible vision chat completion
   const body = {
     model: config.ai.model,
-    temperature: 0.1,
+    temperature: 0.4,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: promptWithMethod },
@@ -203,7 +203,8 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
     // Log and fall back to mock so the flow always works in development.
     console.warn("[ocrService] AI provider unavailable, using mock:", e.message);
   }
-  if (!rows || (Array.isArray(rows) && rows.length === 0)) rows = mockExtract(imageBuffer, fileName, recordMethod);
+  // Always rely on AI extraction. If AI returns nothing, return empty array.
+  if (!rows) rows = [];
 
   const extracted = rows.map((r) => ({
     id: nextId("ext"),

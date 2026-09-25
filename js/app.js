@@ -1760,7 +1760,7 @@ function renderReview(scan) {
   } else {
     panel.innerHTML = ""; // Clear previous content so new scan replaces old table
   }
-  panel.scrollIntoView({ behavior: "smooth" });
+  panel.scrollIntoView({ behavior: "auto", block: "nearest" });
 
   panel.innerHTML = `<h2 class="section-title">${t("scan.reviewTitle")}</h2>
     <p class="lede">${t("scan.reviewHint")}</p>
