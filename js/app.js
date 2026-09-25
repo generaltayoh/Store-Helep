@@ -1654,6 +1654,7 @@ async function loadScans() {
         s.status === "saved" ? t("common.verified") : t("common.needsReviewLower")
       }</span></span>
         <span class="badge ${badge}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${label}</span>
+        <button class="mini-btn ghost" onclick="deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:auto;">✕</button>
       </div>`
     );
   });
@@ -1683,6 +1684,7 @@ async function loadHistory() {
           s.status === "saved" ? t("common.verified") : t("common.needsReviewLower")
         }</span></span>
           <span class="badge ${badge}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${label}</span>
+          <button class="mini-btn ghost" onclick="deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:auto;">✕</button>
         </div>`;
       })
       .join("");
@@ -1832,6 +1834,19 @@ async function openScanReview(scanId) {
     renderReview(scan);
   } catch (err) {
     toast(err.message || "Failed to load scan review", "error");
+  }
+}
+
+async function deleteScanById(id, btn) {
+  if (!confirm("Delete this scan?")) return;
+  try {
+    await api(`/scans/${id}`, { method: "DELETE" });
+    const card = btn.closest(".prev-scan-card, .hist-row");
+    if (card) card.remove();
+    toast("Scan deleted");
+    loadScans().catch(console.error);
+  } catch (err) {
+    toast(err.message || "Delete failed", "error");
   }
 }
 
