@@ -1761,6 +1761,7 @@ function renderReview(scan) {
   panel.innerHTML = `<h2 class="section-title">${t("scan.reviewTitle")}</h2>
     <p class="lede">${t("scan.reviewHint")}</p>
     <div id="reviewRows"></div>
+    <button class="btn btn-secondary" id="cancelScanBtn" style="margin-top:12px;margin-right:8px;background:#ccc;color:#333;">${t("common.cancel")}</button>
     <button class="btn btn-primary" id="confirmScanBtn" style="margin-top:12px;">${t("scan.confirm")}</button>`;
 
   const rowsWrap = panel.querySelector("#reviewRows");
@@ -1777,6 +1778,12 @@ function renderReview(scan) {
       <input class="input" data-field="quantity" type="number" value="${r.quantity}" style="width:60px;" />
       <input class="input" data-field="unitPrice" type="number" value="${r.unitPrice}" style="width:90px;" />`;
     rowsWrap.appendChild(row);
+  });
+
+  const cancelBtn = panel.querySelector("#cancelScanBtn");
+  cancelBtn.addEventListener("click", () => {
+    panel.remove();
+    setScanStatus("hidden");
   });
 
   const confirmBtn = panel.querySelector("#confirmScanBtn");
