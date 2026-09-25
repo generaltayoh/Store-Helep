@@ -1838,7 +1838,6 @@ async function openScanReview(scanId) {
 }
 
 async function deleteScanById(id, btn) {
-  if (!confirm("Delete this scan?")) return;
   try {
     await api(`/scans/${id}`, { method: "DELETE" });
     const card = btn.closest(".prev-scan-card, .hist-row");
