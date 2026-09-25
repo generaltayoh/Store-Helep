@@ -93,6 +93,7 @@ const I18N = {
     "history.title": "Previous scans", "history.empty": "You haven't scanned anything yet.",
     "scan.reviewTitle": "Review extracted records",
     "scan.reviewHint": "Confirm each row before it becomes an official record.",
+    "scan.noRecordsFound": "No matching records found under this scan. The image did not match any products in the system.",
     "scan.confirm": "Confirm & save", "scan.failed": "Scan failed",
     "scan.saved": "Scan saved as records", "scan.confirmFailed": "Confirm failed",
     "scan.page": "Page 1", "scan.fitFrame": "Fit the whole page inside the frame",
@@ -228,6 +229,7 @@ const I18N = {
     "history.title": "Scans précédents", "history.empty": "Vous n'avez encore rien scanné.",
     "scan.reviewTitle": "Vérifier les registres extraits",
     "scan.reviewHint": "Confirmez chaque ligne avant qu'elle devienne un registre officiel.",
+    "scan.noRecordsFound": "Aucun registre correspondant trouvé sous ce scan. L'image ne correspond à aucun produit du système.",
     "scan.confirm": "Confirmer & enregistrer", "scan.failed": "Échec du scan",
     "scan.saved": "Scan enregistré comme registres", "scan.confirmFailed": "Échec de la confirmation",
     "scan.page": "Page 1", "scan.fitFrame": "Placez toute la page dans le cadre",
@@ -1765,6 +1767,12 @@ function renderReview(scan) {
     panel.innerHTML = ""; // Clear previous content so new scan replaces old table
   }
   panel.scrollIntoView({ behavior: "auto", block: "nearest" });
+
+  if (!scan.extracted || scan.extracted.length === 0) {
+    panel.innerHTML = `<h2 class="section-title">${t("scan.reviewTitle")}</h2>
+      <p class="lede">${t("scan.noRecordsFound") || "No matching records found under this scan. The AI did not match any products from the image with the products in the system."}</p>`;
+    return;
+  }
 
   panel.innerHTML = `<h2 class="section-title">${t("scan.reviewTitle")}</h2>
     <p class="lede">${t("scan.reviewHint")}</p>

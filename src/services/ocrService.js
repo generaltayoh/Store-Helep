@@ -1,5 +1,7 @@
 import { config } from "../config/index.js";
 import { db, nextId } from "../data/store.js";
+import { isSupabaseConfigured } from "../config/supabase.js";
+import { supabaseService } from "./supabaseService.js";
 
 /*
  * OCR / AI extraction service.
@@ -189,6 +191,21 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
   return Array.isArray(rows) ? rows : [];
 }
 
+function fuzzyMatch(name, candidates) {
+  const n = (name || "").toLowerCase().trim();
+  for (const c of candidates) {
+    const cn = (c.name || c.productName || "").toLowerCase().trim();
+    if (n === cn) return true; // exact
+    if (n.includes(cn) || cn.includes(n)) return true; // partial overlap
+    // Similarity: split by spaces and check common words
+    const words = cn.split(/\s+/);
+    for (const w of words) {
+      if (w.length > 2 && n.includes(w)) return true;
+    }
+  }
+  return false;
+}
+
 export async function extractRecords(imageBuffer, fileName = "upload.jpg", recordMethod = "Notebook") {
   if (!Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
     const err = new Error("A non-empty image buffer is required.");
@@ -206,7 +223,33 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
   // Always rely on AI extraction. If AI returns nothing, return empty array.
   if (!rows) rows = [];
 
-  const extracted = rows.map((r) => ({
+  // Build product catalog from system (mock DB or Supabase)
+  let productCatalog = db.products || [];
+  if (isSupabaseConfigured() && supabaseService) {
+    try {
+      const biz = await supabaseService.getBusiness();
+      const bizId = biz?.id;
+      if (bizId) {
+        const supaProds = await supabaseService.listProducts({ businessId: bizId });
+        if (supaProds && supaProds.length > 0) productCatalog = supaProds;
+      }
+    } catch (e) {
+      // Ignore; fall back to db.products
+    }
+  }
+
+  // Filter AI results to only those that match something in the system catalog
+  const matchedRows = rows.filter((r) => {
+    const name = String(r.productName || "");
+    return fuzzyMatch(name, productCatalog);
+  });
+
+  // If nothing matched and catalog exists, return empty array (no table)
+  if (matchedRows.length === 0 && productCatalog.length > 0) {
+    return { extracted: [], needsReview: false };
+  }
+
+  const extracted = matchedRows.map((r) => ({
     id: nextId("ext"),
     productName: String(r.productName || "Unknown item"),
     quantity: Number(r.quantity) > 0 ? Number(r.quantity) : 1,
