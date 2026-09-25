@@ -1719,6 +1719,10 @@ function initScan() {
     try {
       const scan = await api("/scans", { method: "POST", body: fd, auth: false });
       setScanStatus("done");
+      if (!scan.extracted || scan.extracted.length === 0) {
+        toast("No records found in the image. Please take the photo again.", "error");
+        return;
+      }
       renderReview(scan);
     } catch (err) {
       setScanStatus("error", err.message || t("scan.failed"));
@@ -1785,15 +1789,9 @@ function renderReview(scan) {
   });
 
   const cancelBtn = panel.querySelector("#cancelScanBtn");
-  cancelBtn.addEventListener("click", async () => {
-    try {
-      await api(`/scans/${scan.id}`, { method: "DELETE" });
-    } catch (e) {
-      // Ignore delete errors; just hide locally.
-    }
+  cancelBtn.addEventListener("click", () => {
     panel.remove();
     setScanStatus("hidden");
-    loadScans().catch(console.error);
   });
 
   const confirmBtn = panel.querySelector("#confirmScanBtn");
