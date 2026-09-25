@@ -3,7 +3,10 @@ import { getSupabaseClient } from "../config/supabase.js";
 import { db } from "../data/store.js";
 
 export async function tokenAuth(req, _res, next) {
-  const token = req.headers.token || req.headers.authorization || null;
+  let token = req.headers.token || req.headers.authorization || null;
+  if (token && typeof token === "string" && token.toLowerCase().startsWith("bearer ")) {
+    token = token.slice(7).trim();
+  }
 
   if (!token) {
     return next(); // Allow public routes (health, etc.)
