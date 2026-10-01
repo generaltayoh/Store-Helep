@@ -1364,8 +1364,26 @@ async function loadRecords(filter = "today", from = "", to = "") {
       const tB = new Date(b.items[0].timestamp || 0).getTime();
       return tA - tB;
     });
-    const batchCards = sortedBatchEntries.map((b, idx) => {
-      const batchNum = idx + 1;
+    // Assign batch numbers by chronological order (oldest first = B1)
+    const allBatchEntries = Object.values(batches);
+    const chronologicallySorted = [...allBatchEntries].sort((a, b) => {
+      const tA = new Date(a.items[0].timestamp || 0).getTime();
+      const tB = new Date(b.items[0].timestamp || 0).getTime();
+      return tA - tB;
+    });
+    const batchNumMap = new Map();
+    chronologicallySorted.forEach((b, idx) => {
+      batchNumMap.set(b.items[0].scanId || ("manual_" + b.items[0].productName + "_" + b.items[0].time), idx + 1);
+    });
+    // Display newest first (descending time)
+    const displaySorted = [...allBatchEntries].sort((a, b) => {
+      const tA = new Date(a.items[0].timestamp || 0).getTime();
+      const tB = new Date(b.items[0].timestamp || 0).getTime();
+      return tB - tA;
+    });
+    const batchCards = displaySorted.map((b) => {
+      const key = b.items[0].scanId || ("manual_" + b.items[0].productName + "_" + b.items[0].time);
+      const batchNum = batchNumMap.get(key) || 1;
       const label = b.items[0].scanId ? "Batch" : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
       const timeOnly = b.items[0].timestamp ? new Date(b.items[0].timestamp).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) : new Date().toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
       return `<a href="batch.html?scan=${b.items[0].scanId || ''}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:var(--card,#fff);box-shadow:var(--shadow-card);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='var(--shadow-pop)'" onmouseout="this.style.boxShadow='var(--shadow-card)'">
@@ -1482,8 +1500,11 @@ async function initBatch() {
     let batchNum = 1;
     try {
       const allScansRes = await api("/scans");
-      const allIds = (allScansRes.scans || allScansRes).map(s => s.id || s);
-      const index = allIds.indexOf(scanId);
+      const scansArray = (allScansRes.scans || allScansRes);
+      // Sort ASC by createdAt to get chronological batch order
+      const sortedAsc = [...scansArray].sort((a, b) => new Date(a.createdAt || a.created_at || 0).getTime() - new Date(b.createdAt || b.created_at || 0).getTime());
+      const sortedIds = sortedAsc.map(s => s.id || s);
+      const index = sortedIds.indexOf(scanId);
       batchNum = index >= 0 ? index + 1 : 1;
     } catch (e) { /* ignore */ }
     if (title) title.textContent = "Batch " + batchNum;
