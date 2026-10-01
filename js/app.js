@@ -1390,7 +1390,7 @@ async function loadRecords(filter = "today", from = "", to = "") {
       const batchNum = batchNumMap.get(key) || 1;
       const label = b.items[0].scanId ? "Batch" : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
       const timeOnly = b.items[0].timestamp ? new Date(b.items[0].timestamp).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) : new Date().toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
-      return `<a href="batch.html?scan=${b.items[0].scanId || ''}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:var(--card,#fff);box-shadow:var(--shadow-card);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='var(--shadow-pop)'" onmouseout="this.style.boxShadow='var(--shadow-card)'">
+      return `<a href="batch.html?scan=${b.items[0].scanId || ''}&batch=${batchNum}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:var(--card,#fff);box-shadow:var(--shadow-card);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='var(--shadow-pop)'" onmouseout="this.style.boxShadow='var(--shadow-card)'">
         <span class="avatar green" style="flex-shrink:0;width:44px;height:44px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1f3d2b,#2a5a3f);color:#fff;border-radius:50%;letter-spacing:0.5px;">B${batchNum}</span>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
@@ -1500,17 +1500,8 @@ async function initBatch() {
     const scan = await api(`/scans/${scanId}`);
     const title = document.getElementById("batchTitle");
     const sub = document.getElementById("batchSub");
-    // Determine batch number by time order among all scans
-    let batchNum = 1;
-    try {
-      const allScansRes = await api("/scans");
-      const scansArray = (allScansRes.scans || allScansRes);
-      // Sort ASC by createdAt to get chronological batch order
-      const sortedAsc = [...scansArray].sort((a, b) => new Date(a.createdAt || a.created_at || 0).getTime() - new Date(b.createdAt || b.created_at || 0).getTime());
-      const sortedIds = sortedAsc.map(s => s.id || s);
-      const index = sortedIds.indexOf(scanId);
-      batchNum = index >= 0 ? index + 1 : 1;
-    } catch (e) { /* ignore */ }
+    // Determine batch number from URL param (passed from card) so it matches the card exactly
+    let batchNum = params.get("batch") ? parseInt(params.get("batch"), 10) : 1;
     if (title) title.textContent = "Batch " + batchNum;
     if (sub) sub.textContent = new Date(scan.createdAt || Date.now()).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
     const content = document.getElementById("batchContent");
