@@ -1976,8 +1976,8 @@ window.bulkDeleteSelected = async function() {
     }
   }
   toast(`Deleted ${ids.length} scans`);
-  loadHistory().catch(console.error);
-  toggleBulkDeleteBtn(); // hide button again
+  await loadHistory().catch(console.error);
+  toggleBulkDeleteBtn(); // hide button after reload
   }});
 };
 
