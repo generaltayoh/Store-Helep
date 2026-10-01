@@ -1740,16 +1740,13 @@ async function loadScans() {
     const date = new Date(s.createdAt).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
     const badge = s.status === "saved" ? "green" : "amber";
     const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
-    const clickAttr = s.status === "needs_review" ? `onclick="openScanReview('${s.id}')" style="cursor:pointer;"` : "";
+    const clickAttr = s.status === "needs_review" ? `onclick="window.location.href='scan.html?scan=${encodeURIComponent(s.id)}'" style="cursor:pointer;"` : "";
     heading.insertAdjacentHTML(
       "afterend",
-      `<div class="card prev-scan-card" ${clickAttr}>
-        <span class="thumb"></span>
-        <span class="mid"><b>Page — ${date}</b><span>${s.recordCount} ${t("common.records")} · ${
-        s.status === "saved" ? t("common.verified") : t("common.needsReviewLower")
-      }</span></span>
-        <span class="badge ${badge}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${label}</span>
-          <button class="mini-btn ghost" onclick="event.stopPropagation(); deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:auto;">✕</button>
+      `<div class="card prev-scan-card" ${clickAttr} style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--card,#fff);box-shadow:var(--shadow-card);font-size:13px;min-height:44px;">
+        <span style="flex:1;min-width:0;line-height:1.3;"><b style="font-size:13px;color:var(--ink,#12241D);">Page — ${date}</b><span style="font-size:11px;color:var(--ink-soft,#777);display:block;">${s.recordCount} ${t("common.records")}</span></span>
+        <span class="badge ${badge}" style="font-size:10px;padding:2px 6px;border-radius:8px;flex-shrink:0;">${label}</span>
+        <button class="mini-btn ghost" onclick="event.stopPropagation(); deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:2px;padding:2px 4px;font-size:11px;">✕</button>
       </div>`
     );
   });
@@ -1772,15 +1769,13 @@ async function loadHistory() {
         const badge = s.status === "saved" ? "green" : "amber";
         const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
         const timeStr = new Date(s.createdAt).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
-        const clickAttr = s.status === "needs_review" ? `onclick="openScanReview('${s.id}')" style="cursor:pointer;"` : "";
+        const clickAttr = s.status === "needs_review" ? `onclick="window.location.href='scan.html?scan=${encodeURIComponent(s.id)}'" style="cursor:pointer;"` : "";
         return `<div class="card hist-row" ${clickAttr} style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:10px;background:var(--card,#fff);box-shadow:var(--shadow-card);font-size:13px;min-height:44px;">
           <label class="scan-checkbox-label" onclick="event.stopPropagation()" style="flex-shrink:0;">
             <input type="checkbox" value="${s.id}" class="scan-checkbox" onchange="toggleBulkDeleteBtn()" style="margin-right:6px; transform:scale(1.1); cursor:pointer;" />
           </label>
           <span class="hist-date" style="font-size:10px;color:var(--ink-soft,#777);min-width:42px;line-height:1.2;"><b style="font-size:14px;color:var(--ink,#12241D);">${day}</b><span style="display:block;">${my}</span></span>
-          <span class="mid" style="flex:1;min-width:0;line-height:1.3;"><b style="font-size:12px;color:var(--ink,#12241D);">${s.recordCount} ${t("common.records")} · <span style="font-weight:400;color:var(--ink-soft,#777);">${timeStr}</span></b><span style="font-size:10px;color:var(--ink-soft,#777);display:block;">${
-          s.status === "saved" ? t("common.verified") : t("common.needsReviewLower")
-        }</span></span>
+          <span class="mid" style="flex:1;min-width:0;line-height:1.3;"><b style="font-size:12px;color:var(--ink,#12241D);">${s.recordCount} ${t("common.records")} · <span style="font-weight:400;color:var(--ink-soft,#777);">${timeStr}</span></b></span>
           <span class="badge ${badge}" style="font-size:10px;padding:2px 6px;border-radius:8px;flex-shrink:0;">${label}</span>
           <button class="mini-btn ghost" onclick="event.stopPropagation(); deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:2px;padding:2px 4px;font-size:11px;">✕</button>
         </div>`;
