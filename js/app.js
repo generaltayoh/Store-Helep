@@ -676,10 +676,14 @@ function initCamera() {
     try {
       if (window.ImageCapture) {
         const imageCapture = new ImageCapture(track);
-        const mode = torchOn ? "flash" : "off";
-        await imageCapture.setOptions({ fillLightMode: mode });
-        if (flashBtn) flashBtn.classList.toggle("active", torchOn);
-        return;
+        // Try both "torch" and "flash" modes for Samsung/Android compatibility
+        for (const modeName of torchOn ? ["torch", "flash"] : ["off", "none"]) {
+          try {
+            await imageCapture.setOptions({ fillLightMode: modeName });
+            if (flashBtn) flashBtn.classList.toggle("active", torchOn);
+            return;
+          } catch (e) { /* try next mode */ }
+        }
       }
     } catch (e) { /* fall through */ }
 
@@ -1511,7 +1515,7 @@ async function initBatch() {
     if (sub) sub.textContent = new Date(scan.createdAt || Date.now()).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
     const content = document.getElementById("batchContent");
     if (!content || !scan.extracted || !scan.extracted.length) {
-      if (content) content.innerHTML = `<p style="color:#777;font-size:14px;">No records in this batch.</p>`;
+      if (content) content.innerHTML = `<p style="color:var(--ink-soft,#777);font-size:14px;">No records in this batch.</p>`;
       return;
     }
     const itemsHtml = scan.extracted.map((r) => {
@@ -1520,18 +1524,18 @@ async function initBatch() {
       const price = r.unitPrice || r.unit_price || 0;
       const total = qty * price;
       return `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #ecebe8;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border,#ecebe8);">
           <div>
-            <div style="font-weight:600;color:#1a2e1a;font-size:15px;">${name}</div>
-            <div style="font-size:12px;color:#777;margin-top:2px;">Quantity: ${qty}</div>
+            <div style="font-weight:600;color:var(--ink,#1a2e1a);font-size:15px;">${name}</div>
+            <div style="font-size:12px;color:var(--ink-soft,#777);margin-top:2px;">Quantity: ${qty}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-weight:600;color:#1a2e1a;font-size:15px;">FCFA ${fmt(total)}</div>
-            <div style="font-size:12px;color:#777;">@ FCFA ${fmt(price)}</div>
+            <div style="font-weight:600;color:var(--ink,#1a2e1a);font-size:15px;">FCFA ${fmt(total)}</div>
+            <div style="font-size:12px;color:var(--ink-soft,#777);">@ FCFA ${fmt(price)}</div>
           </div>
         </div>`;
     }).join("");
-    content.innerHTML = `<div style="background:#fff;border-radius:14px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">` + itemsHtml + `</div>`;
+    content.innerHTML = `<div style="background:var(--card,#fff);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow-card);">` + itemsHtml + `</div>`;
   } catch (err) {
     const content = document.getElementById("batchContent");
     if (content) content.innerHTML = `<p style="color:#777;font-size:14px;">Batch not found.</p>`;
