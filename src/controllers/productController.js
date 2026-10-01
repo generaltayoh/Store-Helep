@@ -121,6 +121,27 @@ export async function updateProduct(req, res, next) {
   }
 }
 
+export async function deleteProduct(req, res, next) {
+  try {
+    if (isSupabaseConfigured()) {
+      const product = await supabaseService.getProduct(req.params.id);
+      if (!product) return res.status(404).json({ error: "Product not found." });
+      const supabase = (await import("../config/supabase.js")).getSupabaseClient();
+      if (supabase) {
+        const { error } = await supabase.from("products").delete().eq("id", req.params.id);
+        if (error) throw error;
+        return res.status(204).send();
+      }
+    }
+    const idx = db.products.findIndex((p) => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: "Product not found." });
+    db.products.splice(idx, 1);
+    return res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function restockProduct(req, res, next) {
   try {
     const addQty = Number(req.body.addQty);

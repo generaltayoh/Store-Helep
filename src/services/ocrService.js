@@ -220,8 +220,8 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
     // Log and fall back to mock so the flow always works in development.
     console.warn("[ocrService] AI provider unavailable, using mock:", e.message);
   }
-  // Always rely on AI extraction. If AI returns nothing, return empty array.
-  if (!rows) rows = [];
+  // Always rely on AI extraction. If AI returns nothing, use the mock generator.
+  if (!rows) rows = mockExtract(imageBuffer, fileName, recordMethod);
 
   // Build product catalog from system (mock DB or Supabase)
   let productCatalog = db.products || [];
@@ -238,31 +238,26 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
     }
   }
 
-  // Filter AI results to only those that match something in the system catalog
-  const matchedRows = rows.filter((r) => {
-    const name = String(r.productName || "");
-    return fuzzyMatch(name, productCatalog);
+  // Instead of filtering out unrecognised items, we keep them and flag as isUnknown
+  const extracted = rows.map((r) => {
+    const name = String(r.productName || "Unknown item");
+    const isMatched = productCatalog.length === 0 || fuzzyMatch(name, productCatalog);
+    return {
+      id: nextId("ext"),
+      productName: name,
+      quantity: Number(r.quantity) > 0 ? Number(r.quantity) : 1,
+      unitPrice: Number(r.unitPrice) || 0,
+      date: r.date ? new Date(r.date) : new Date(),
+      confidence: Number(r.confidence) || 0.9,
+      isUnknown: !isMatched,
+    };
   });
-
-  // If nothing matched and catalog exists, return empty array (no table)
-  if (matchedRows.length === 0 && productCatalog.length > 0) {
-    return { extracted: [], needsReview: false };
-  }
-
-  const extracted = matchedRows.map((r) => ({
-    id: nextId("ext"),
-    productName: String(r.productName || "Unknown item"),
-    quantity: Number(r.quantity) > 0 ? Number(r.quantity) : 1,
-    unitPrice: Number(r.unitPrice) || 0,
-    date: r.date ? new Date(r.date) : new Date(),
-    confidence: Number(r.confidence) || 0.9,
-  }));
 
   return {
     extracted,
     // A scan needs review if any row is low-confidence or unrecognised.
     needsReview: extracted.some(
-      (r) => r.confidence < 0.6 || r.productName === "Unknown item" || r.unitPrice === 0
+      (r) => r.confidence < 0.6 || r.productName === "Unknown item" || r.unitPrice === 0 || r.isUnknown
     ),
   };
 }

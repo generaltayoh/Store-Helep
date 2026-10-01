@@ -67,6 +67,7 @@ export async function listRecords(req, res, next) {
         }),
         source: r.source,
         status: r.status,
+        scanId: r.scanId,
       });
     }
 

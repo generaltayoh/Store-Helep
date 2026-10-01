@@ -634,24 +634,50 @@ export const supabaseService = {
     }
 
     const supabase = getSupabaseClient();
-    const recordsToInsert = scan.extracted.map((row) => ({
-      business_id: (scan.business_id) || (undefined),
-      product_id: null,
-      product_name: row.productName,
-      quantity: row.quantity,
-      unit_price: row.unitPrice,
-      amount: row.quantity * row.unitPrice,
-      timestamp: scan.createdAt.toISOString(),
-      source: "scanned",
-      status: "saved",
-      scan_id: scan.id,
-    }));
-
-    // If business_id is needed, fetch default business
     const biz = await this.getBusiness();
     const defaultBizId = biz?.id;
-    for (const r of recordsToInsert) {
-      if (!r.business_id) r.business_id = defaultBizId;
+
+    // Fetch current products to match unknown items
+    let currentProducts = [];
+    try {
+      currentProducts = await this.listProducts({ businessId: defaultBizId });
+    } catch (e) { /* ignore */ }
+
+    // Helper to find or create product, and restock matched products
+    async function findOrCreateProduct(row) {
+      const match = currentProducts.find(p => String(p.name).toLowerCase() === String(row.productName || row.product_name || "").toLowerCase());
+      if (match) {
+        // Restock the matched product
+        await supabaseService.restockProduct(match.id, Number(row.quantity || 1));
+        return match.id;
+      }
+      // Create new product for unknown/unmatched items
+      const newProd = await supabaseService.createProduct({
+        sku: row.productName ? String(row.productName).substring(0, 20).replace(/\s+/g, "-") + "-" + Date.now() : "AUTO-" + Date.now(),
+        name: row.productName || row.product_name || "Unknown item",
+        category: "Other",
+        unitPrice: Number(row.unitPrice || row.unit_price || 0),
+        stockQty: Number(row.quantity || 1),
+        businessId: defaultBizId,
+      });
+      return newProd ? newProd.id : null;
+    }
+
+    const recordsToInsert = [];
+    for (const row of scan.extracted || []) {
+      const productId = await findOrCreateProduct(row);
+      recordsToInsert.push({
+        business_id: defaultBizId,
+        product_id: productId,
+        product_name: row.productName || row.product_name,
+        quantity: Number(row.quantity || 1),
+        unit_price: Number(row.unitPrice || row.unit_price || 0),
+        amount: Number(row.quantity || 1) * Number(row.unitPrice || row.unit_price || 0),
+        timestamp: (scan.createdAt || new Date()).toISOString(),
+        source: "scanned",
+        status: "saved",
+        scan_id: scan.id,
+      });
     }
 
     if (recordsToInsert.length > 0) {

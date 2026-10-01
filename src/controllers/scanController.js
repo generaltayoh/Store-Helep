@@ -4,19 +4,40 @@ import { isSupabaseConfigured } from "../config/supabase.js";
 import { getSupabaseClient } from "../config/supabase.js";
 import { supabaseService } from "../services/supabaseService.js";
 
+// Basic fuzzy match function reproduced here to easily match products
+function fuzzyMatch(name, candidates) {
+  const n = (name || "").toLowerCase().trim();
+  for (const c of candidates) {
+    const cn = (c.name || c.productName || "").toLowerCase().trim();
+    if (n === cn) return true; // exact
+    if (n.includes(cn) || cn.includes(n)) return true; // partial overlap
+    const words = cn.split(/\s+/);
+    for (const w of words) {
+      if (w.length > 2 && n.includes(w)) return true;
+    }
+  }
+  return false;
+}
+
 function serializeScan(scan) {
+  // Ensure each extracted row has isUnknown computed (for mock DB it's set by ocrService; for Supabase we enrich here if needed).
+  const enriched = (scan.extracted || []).map((r) => {
+    if (r.isUnknown !== undefined) return r;
+    // Fallback: we don't have products here synchronously; controllers for Supabase will enrich before calling serializeScan.
+    return { ...r, isUnknown: false };
+  });
   return {
     id: scan.id,
     fileName: scan.fileName,
     imageUrl: scan.imageUrl,
     createdAt: scan.createdAt,
     status: scan.status,
-    recordCount: scan.extracted.length,
-    extracted: scan.extracted,
+    recordCount: scan.extracted ? scan.extracted.length : 0,
+    extracted: enriched,
     needsReview:
       scan.status === "needs_review" ||
-      scan.extracted.some(
-        (r) => r.confidence < 0.6 || r.productName === "Unknown item" || r.unitPrice === 0
+      enriched.some(
+        (r) => r.confidence < 0.6 || r.productName === "Unknown item" || r.unitPrice === 0 || r.isUnknown
       ),
   };
 }
@@ -173,9 +194,36 @@ export async function confirmScan(req, res, next) {
 
     const created = [];
     for (const row of scan.extracted) {
+      let productId = null;
+      
+      // Auto-add unknown product
+      if (row.isUnknown) {
+        const existing = db.products.find(p => String(p.name).toLowerCase() === String(row.productName).toLowerCase());
+        if (!existing) {
+          const newProduct = {
+            id: nextId("prod"),
+            name: row.productName,
+            category: "Other",
+            unitPrice: row.unitPrice,
+            stockQty: row.quantity,
+            stockStatus: "in_stock",
+          };
+          db.products.push(newProduct);
+          productId = newProduct.id;
+        } else {
+          productId = existing.id;
+        }
+      } else {
+        const match = db.products.find(p => fuzzyMatch(row.productName, [p]));
+        productId = match ? match.id : null;
+        if (match) {
+          match.stockQty = (match.stockQty || 0) + row.quantity;
+        }
+      }
+
       const record = {
         id: nextId("rec"),
-        productId: null,
+        productId: productId,
         productName: row.productName,
         quantity: row.quantity,
         unitPrice: row.unitPrice,

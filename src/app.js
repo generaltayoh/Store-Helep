@@ -35,6 +35,13 @@ app.use("/api/export", exportRoutes);
 // Serve the existing static frontend.
 app.use(express.static(projectRoot));
 
+import { db, resetStore } from "./data/store.js";
+
+app.post("/api/clear", (_req, res) => {
+  resetStore();
+  res.json({ cleared: true });
+});
+
 // Health check.
 app.get("/api/health", (_req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 

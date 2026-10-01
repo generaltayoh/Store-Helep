@@ -7,6 +7,7 @@ import {
   getProduct,
   updateProduct,
   restockProduct,
+  deleteProduct,
 } from "../controllers/productController.js";
 
 const router = Router();
@@ -17,5 +18,6 @@ router.post("/", asyncHandler(createProductHandler));
 router.get("/:id", asyncHandler(getProduct));
 router.patch("/:id", asyncHandler(updateProduct));
 router.post("/:id/restock", asyncHandler(restockProduct));
+router.delete("/:id", asyncHandler(deleteProduct));
 
 export default router;

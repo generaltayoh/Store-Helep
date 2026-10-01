@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F7F4EC">
+  <title>Batch · Store Helep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .batch-page { padding: 12px 16px; }
+    .batch-page .back-link { font-size: 14px; color: #1f5a3b; text-decoration: none; display: inline-block; margin-bottom: 8px; }
+    .batch-page .page-title { font-size: 22px; margin-bottom: 6px; }
+    .batch-summary { font-size: 13px; color: #777; margin-bottom: 10px; letter-spacing: 0.3px; }
+    .batch-summary b { color: #1a2e1a; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main class="app has-nav">
+    <section class="batch-page">
+      <a href="records.html" class="back-link">← Back to Records</a>
+      <h1 class="page-title" id="batchTitle" style="font-size:20px;font-weight:700;color:#1a2e1a;">Batch</h1>
+      <div style="font-size:12px;color:#777;margin-top:-2px;margin-bottom:14px;letter-spacing:0.3px;" id="batchSub"></div>
+      <div id="batchContent"></div>
+    </section>
+    <nav class="bottom-nav">
+      <a class="nav-item" href="dashboard.html">Home</a>
+      <a class="nav-item" href="records.html">Records</a>
+      <a class="nav-item scan" href="scan.html"><span>Scan</span></a>
+      <a class="nav-item" href="products.html">Products</a>
+      <a class="nav-item" href="analytics.html">Analytics</a>
+    </nav>
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>

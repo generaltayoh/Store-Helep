@@ -1,7 +1,7 @@
 /* Store Helep — app.js (frontend wiring + API client) */
 
 /* ---------------- API client + local state ---------------- */
-const API_BASE = "/api";
+const API_BASE = (window.location.protocol === 'file:' || (window.location.hostname === 'localhost' && window.location.port !== '3000') || (window.location.hostname === '127.0.0.1' && window.location.port !== '3000')) ? "http://localhost:3000/api" : "/api";
 
 let analyticsProductId = "";
 let loadedProducts = [];
@@ -483,6 +483,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const clearBtn = document.getElementById("clearAllBtn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (!confirm("Are you sure you want to clear all data? This cannot be undone.")) return;
+      api("/clear", { method: "POST" }).then(() => {
+        toast("All data cleared");
+        setTimeout(() => window.location.reload(), 1200);
+      }).catch(err => toast(err.message || "Clear failed", "error"));
+    });
+  }
+
   /* ---- Hamburger dropdown ---- */
   const hamburgerBtn = document.getElementById("hamburgerBtn");
   const dropdownMenu = document.getElementById("dropdownMenu");
@@ -592,6 +603,7 @@ function initPage() {
   if (document.querySelector(".analytics-page")) return initAnalytics();
   if (document.querySelector(".scan-page")) return initScan();
   if (document.querySelector(".history-page")) return loadHistory();
+  if (document.querySelector(".batch-page")) return initBatch();
   if (document.querySelector(".cam-view")) return initCamera();
 }
 
@@ -1156,6 +1168,7 @@ function productCardHtml(p) {
       <span class="prod-actions">
         <button class="mini-btn" data-action="restock" data-id="${p.id}">${t("prod.restock")}</button>
         <button class="mini-btn ghost" data-action="edit" data-id="${p.id}">${t("prod.edit")}</button>
+        <button class="mini-btn ghost red" data-action="delete" data-id="${p.id}" aria-label="Delete">✕</button>
       </span>
     </span>
   </div>`;
@@ -1303,6 +1316,14 @@ async function initProducts() {
       if (!product) return;
       if (btn.dataset.action === "restock") openRestockModal(product);
       else if (btn.dataset.action === "edit") openEditProductModal(product);
+      else if (btn.dataset.action === "delete") {
+        if (!confirm("Delete this product?")) return;
+        api(`/products/${id}`, { method: "DELETE" }).then(async () => {
+          toast("Product deleted");
+          const f = currentProductFilter();
+          await Promise.all([loadProductStats(), loadProducts(f.stockStatus, f.category)]);
+        }).catch(err => toast(err.message || "Delete failed", "error"));
+      }
     });
   }
 }
@@ -1337,21 +1358,22 @@ async function loadRecords(filter = "today", from = "", to = "") {
       batches[key].total += Number(r.amount || 0);
       batches[key].count += 1;
     });
-    const batchCards = Object.values(batches).map((b) => {
-      const label = b.items[0].scanId ? (b.items[0].scanId ? "Scan session" : "Manual") : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
-      return `<div class="card record-batch" onclick="this.nextElementSibling?.classList.toggle('hidden')" style="cursor:pointer">
-        <span class="avatar green">${initials(b.items[0].productName)}</span>
-        <span class="mid"><b>${label}</b><span>${b.count} items · ${fcfan(b.total)}</span></span>
-        <span class="right"><span class="chev">›</span></span>
-      </div>
-      <div class="batch-detail hidden" style="padding-left:16px;padding-bottom:8px">${b.items.map(
-        (r) => `<div class="card record-card" style="margin-top:4px;margin-bottom:4px">
-          <span class="avatar ${r.source === "manual" ? "gray" : "green"}">${initials(r.productName)}</span>
-          <span class="mid"><b>${escapeHtml(r.productName)} × ${r.quantity}</b><span>${r.time}</span></span>
-          <span class="right"><b>${fcfan(r.amount)}</b>
-            <span class="badge ${sourceClass(r.source)}">${sourceLabel(r.source)}</span></span>
-        </div>`
-      ).join("")}</div>`;
+    const batchCards = Object.values(batches).map((b, idx) => {
+      const batchNum = idx + 1;
+      const label = b.items[0].scanId ? "Batch" : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
+      const timeOnly = b.items[0].timestamp ? new Date(b.items[0].timestamp).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" }) : new Date().toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" });
+      const linkAttr = b.items[0].scanId ? `onclick="window.location.href='batch.html?scan=${encodeURIComponent(b.items[0].scanId)}'"` : "";
+      return `<a href="batch.html?scan=${b.items[0].scanId || ''}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.04);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='0 4px 14px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='0 2px 6px rgba(0,0,0,0.04)'">
+        <span class="avatar green" style="flex-shrink:0;width:44px;height:44px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1f3d2b,#2a5a3f);color:#fff;border-radius:50%;letter-spacing:0.5px;">B${batchNum}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
+            <b style="font-size:15px;color:#1a2e1a;">${label} ${batchNum}</b>
+            <span style="font-size:12px;color:#777;background:#f2f5f0;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;">${timeOnly}</span>
+          </div>
+          <span style="font-size:13px;color:#555;margin-top:2px;display:block;">${b.count} ${t("common.items")} · ${fcfan(b.total)}</span>
+        </div>
+        <span style="color:#2a5a3f;font-size:22px;font-weight:300;flex-shrink:0;">›</span>
+      </a>`;
     }).join("");
     const html = `<h2 class="day-label">${g.label}</h2>` + batchCards;
     chips.insertAdjacentHTML("afterend", html);
@@ -1442,6 +1464,54 @@ function currentProductFilter() {
   return { stockStatus: "all", category: val }; // Drinks, Groceries, ...
 }
 
+/* ---------------- Batch Detail ---------------- */
+async function initBatch() {
+  const params = new URLSearchParams(window.location.search);
+  const scanId = params.get("scan");
+  if (!scanId) return;
+  try {
+    const scan = await api(`/scans/${scanId}`);
+    const title = document.getElementById("batchTitle");
+    const sub = document.getElementById("batchSub");
+    // Determine batch number by time order among all scans
+    let batchNum = 1;
+    try {
+      const allScansRes = await api("/scans");
+      const allIds = (allScansRes.scans || allScansRes).map(s => s.id || s);
+      const index = allIds.indexOf(scanId);
+      batchNum = index >= 0 ? index + 1 : 1;
+    } catch (e) { /* ignore */ }
+    if (title) title.textContent = "Batch " + batchNum;
+    if (sub) sub.textContent = new Date(scan.createdAt || Date.now()).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" }) + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
+    const content = document.getElementById("batchContent");
+    if (!content || !scan.extracted || !scan.extracted.length) {
+      if (content) content.innerHTML = `<p style="color:#777;font-size:14px;">No records in this batch.</p>`;
+      return;
+    }
+    const itemsHtml = scan.extracted.map((r) => {
+      const name = escapeHtml(r.productName || r.product_name || "Unknown item");
+      const qty = r.quantity || 1;
+      const price = r.unitPrice || r.unit_price || 0;
+      const total = qty * price;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #ecebe8;">
+          <div>
+            <div style="font-weight:600;color:#1a2e1a;font-size:15px;">${name}</div>
+            <div style="font-size:12px;color:#777;margin-top:2px;">Quantity: ${qty}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:600;color:#1a2e1a;font-size:15px;">FCFA ${fmt(total)}</div>
+            <div style="font-size:12px;color:#777;">@ FCFA ${fmt(price)}</div>
+          </div>
+        </div>`;
+    }).join("");
+    content.innerHTML = `<div style="background:#fff;border-radius:14px;padding:8px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">` + itemsHtml + `</div>`;
+  } catch (err) {
+    const content = document.getElementById("batchContent");
+    if (content) content.innerHTML = `<p style="color:#777;font-size:14px;">Batch not found.</p>`;
+  }
+}
+
 /* ---------------- Analytics ---------------- */
 async function loadAnalytics(range = "today", productId = "", from = "", to = "") {
   analyticsProductId = productId || "";
@@ -1499,12 +1569,12 @@ async function loadAnalytics(range = "today", productId = "", from = "", to = ""
           .join("")}
       </select>
     </div>
-    <div class="card chart-card">
+        <div class="card chart-card">
       <div class="chart-head"><b>${chartTitle}</b></div>
-      <div class="chart-area">${chartSVG}</div>
+      ${Number(d.metrics.totalSales) > 0 ? `<div class="chart-area">${chartSVG}</div>
       <div class="chart-labels">${d.weeklyChart
         .map((c) => `<span class="${c.day === "Sun" ? "sun" : ""}">${t("ana." + c.day.toLowerCase())}</span>`)
-        .join("")}</div>
+        .join("")}</div>` : `<div class="chart-empty" style="padding: 40px 0; text-align: center; color: #666;">${t("ana.noSales")}</div>`}
     </div>
     <h2 class="day-label">${t("ana.best")}</h2>
     ${best || emptyRank()}
@@ -1680,6 +1750,9 @@ async function loadHistory() {
         const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
         const clickAttr = s.status === "needs_review" ? `onclick="openScanReview('${s.id}')" style="cursor:pointer;"` : "";
         return `<div class="card hist-row" ${clickAttr}>
+          <label class="scan-checkbox-label" onclick="event.stopPropagation()">
+            <input type="checkbox" value="${s.id}" class="scan-checkbox" onchange="toggleBulkDeleteBtn()" style="margin-right:8px; transform:scale(1.3); cursor:pointer;" />
+          </label>
           <span class="hist-date"><b>${day}</b><span>${my}</span></span>
           <span class="thumb"></span>
           <span class="mid"><b>${s.recordCount} ${t("common.records")}</b><span>${
@@ -1787,10 +1860,13 @@ function renderReview(scan) {
     row.dataset.id = r.id;
     row.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:10px;";
     row.innerHTML = `
-      <span class="avatar ${r.productName === "Unknown item" || r.unitPrice === 0 ? "amber" : "green"}">${initials(
+      <span class="avatar ${r.productName === "Unknown item" || r.unitPrice === 0 || r.isUnknown ? "amber" : "green"}">${initials(
       r.productName
     )}</span>
-      <input class="input" data-field="productName" value="${escapeHtml(r.productName)}" style="flex:2;" />
+      <div style="flex:2; display:flex; flex-direction:column;">
+        <input class="input" data-field="productName" value="${escapeHtml(r.productName)}" style="width:100%;" />
+        ${r.isUnknown ? `<span style="display:inline-block;background:#fdf1f0;color:#b23b3b;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;margin-top:3px;border:1px solid #f5c6c4;">Not part of the system — will be added on confirm</span>` : ""}
+      </div>
       <input class="input" data-field="quantity" type="number" value="${r.quantity}" style="width:60px;" />
       <input class="input" data-field="unitPrice" type="number" value="${r.unitPrice}" style="width:90px;" />`;
     rowsWrap.appendChild(row);
@@ -1854,6 +1930,31 @@ async function deleteScanById(id, btn) {
     toast(err.message || "Delete failed", "error");
   }
 }
+
+window.toggleBulkDeleteBtn = function() {
+  const btn = document.getElementById("bulkDeleteBtn");
+  if (!btn) return;
+  const anyChecked = document.querySelectorAll(".scan-checkbox:checked").length > 0;
+  btn.style.display = anyChecked ? "inline-block" : "none";
+};
+
+window.bulkDeleteSelected = async function() {
+  const checkboxes = document.querySelectorAll(".scan-checkbox:checked");
+  if (!checkboxes.length) return;
+  if (!confirm("Are you sure you want to delete the selected scans?")) return;
+  
+  const ids = Array.from(checkboxes).map(c => c.value);
+  for (const id of ids) {
+    try {
+      await api(`/scans/${id}`, { method: "DELETE" });
+    } catch(err) {
+      console.error(err);
+    }
+  }
+  toast(`Deleted ${ids.length} scans`);
+  loadHistory().catch(console.error);
+  toggleBulkDeleteBtn(); // hide button again
+};
 
 /* ---------------- utils ---------------- */
 function applyDarkMode(on, sync = false) {
