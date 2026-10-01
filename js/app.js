@@ -1769,7 +1769,7 @@ async function loadHistory() {
         const badge = s.status === "saved" ? "green" : "amber";
         const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
         const timeStr = new Date(s.createdAt).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
-        const clickAttr = s.status === "needs_review" ? `onclick="window.location.href='scan.html?scan=${encodeURIComponent(s.id)}'" style="cursor:pointer;"` : "";
+        const clickAttr = `onclick="window.location.href='scan.html?scan=${encodeURIComponent(s.id)}'" style="cursor:pointer;"`;
         return `<div class="card hist-row" ${clickAttr} style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:10px;background:var(--card,#fff);box-shadow:var(--shadow-card);font-size:13px;min-height:44px;">
           <label class="scan-checkbox-label" onclick="event.stopPropagation()" style="flex-shrink:0;">
             <input type="checkbox" value="${s.id}" class="scan-checkbox" onchange="toggleBulkDeleteBtn()" style="margin-right:6px; transform:scale(1.1); cursor:pointer;" />
