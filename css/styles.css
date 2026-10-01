@@ -786,7 +786,7 @@ img, svg { display: block; }
 .cam-video {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; background: #000; display: none;
-  transform: scale(0.1); transform-origin: center center;
+  transform: scale(1.0); transform-origin: center center;
 }
 .cam-video.live { display: block; }
 .cam-gate {
