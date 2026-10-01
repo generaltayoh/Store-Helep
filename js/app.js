@@ -1827,6 +1827,13 @@ function initScan() {
     fileInput.value = "";
   });
 
+  // If loaded with ?scan=, open the review for that scan automatically
+  const paramsScan = new URLSearchParams(window.location.search);
+  const scanParam = paramsScan.get("scan");
+  if (scanParam) {
+    openScanReview(scanParam);
+  }
+
   loadScans().catch(console.error);
 }
 
