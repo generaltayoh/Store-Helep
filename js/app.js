@@ -1358,19 +1358,24 @@ async function loadRecords(filter = "today", from = "", to = "") {
       batches[key].total += Number(r.amount || 0);
       batches[key].count += 1;
     });
-    const batchCards = Object.values(batches).map((b, idx) => {
+    // Sort batches by earliest timestamp to get correct B1, B2, B3 order
+    const sortedBatchEntries = Object.values(batches).sort((a, b) => {
+      const tA = new Date(a.items[0].timestamp || 0).getTime();
+      const tB = new Date(b.items[0].timestamp || 0).getTime();
+      return tA - tB;
+    });
+    const batchCards = sortedBatchEntries.map((b, idx) => {
       const batchNum = idx + 1;
       const label = b.items[0].scanId ? "Batch" : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
-      const timeOnly = b.items[0].timestamp ? new Date(b.items[0].timestamp).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" }) : new Date().toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" });
-      const linkAttr = b.items[0].scanId ? `onclick="window.location.href='batch.html?scan=${encodeURIComponent(b.items[0].scanId)}'"` : "";
-      return `<a href="batch.html?scan=${b.items[0].scanId || ''}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.04);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='0 4px 14px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='0 2px 6px rgba(0,0,0,0.04)'">
+      const timeOnly = b.items[0].timestamp ? new Date(b.items[0].timestamp).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) : new Date().toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
+      return `<a href="batch.html?scan=${b.items[0].scanId || ''}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:var(--card,#fff);box-shadow:var(--shadow-card);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='var(--shadow-pop)'" onmouseout="this.style.boxShadow='var(--shadow-card)'">
         <span class="avatar green" style="flex-shrink:0;width:44px;height:44px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1f3d2b,#2a5a3f);color:#fff;border-radius:50%;letter-spacing:0.5px;">B${batchNum}</span>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
-            <b style="font-size:15px;color:#1a2e1a;">${label} ${batchNum}</b>
-            <span style="font-size:12px;color:#777;background:#f2f5f0;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;">${timeOnly}</span>
+            <b style="font-size:15px;color:var(--ink,#1a2e1a);">${label} ${batchNum}</b>
+            <span style="font-size:12px;color:var(--ink-soft,#777);background:var(--gray-tint,#f2f5f0);padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;">${timeOnly}</span>
           </div>
-          <span style="font-size:13px;color:#555;margin-top:2px;display:block;">${b.count} ${t("common.items")} · ${fcfan(b.total)}</span>
+          <span style="font-size:13px;color:var(--ink-soft,#555);margin-top:2px;display:block;">${b.count} ${t("common.items")} · ${fcfan(b.total)}</span>
         </div>
         <span style="color:#2a5a3f;font-size:22px;font-weight:300;flex-shrink:0;">›</span>
       </a>`;
@@ -1482,7 +1487,7 @@ async function initBatch() {
       batchNum = index >= 0 ? index + 1 : 1;
     } catch (e) { /* ignore */ }
     if (title) title.textContent = "Batch " + batchNum;
-    if (sub) sub.textContent = new Date(scan.createdAt || Date.now()).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit" }) + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
+    if (sub) sub.textContent = new Date(scan.createdAt || Date.now()).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
     const content = document.getElementById("batchContent");
     if (!content || !scan.extracted || !scan.extracted.length) {
       if (content) content.innerHTML = `<p style="color:#777;font-size:14px;">No records in this batch.</p>`;
