@@ -486,11 +486,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearBtn = document.getElementById("clearAllBtn");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      if (!confirm("Are you sure you want to clear all data? This cannot be undone.")) return;
-      api("/clear", { method: "POST" }).then(() => {
-        toast("All data cleared");
-        setTimeout(() => window.location.reload(), 1200);
-      }).catch(err => toast(err.message || "Clear failed", "error"));
+      openConfirmModal({ title: "Clear all data", message: "Are you sure you want to clear all data? This cannot be undone.", onConfirm: () => {
+        api("/clear", { method: "POST" }).then(() => {
+          toast("All data cleared");
+          setTimeout(() => window.location.reload(), 1200);
+        }).catch(err => toast(err.message || "Clear failed", "error"));
+      }});
     });
   }
 
@@ -1321,12 +1322,13 @@ async function initProducts() {
       if (btn.dataset.action === "restock") openRestockModal(product);
       else if (btn.dataset.action === "edit") openEditProductModal(product);
       else if (btn.dataset.action === "delete") {
-        if (!confirm("Delete this product?")) return;
-        api(`/products/${id}`, { method: "DELETE" }).then(async () => {
-          toast("Product deleted");
-          const f = currentProductFilter();
-          await Promise.all([loadProductStats(), loadProducts(f.stockStatus, f.category)]);
-        }).catch(err => toast(err.message || "Delete failed", "error"));
+        openConfirmModal({ title: "Delete product", message: "Delete this product?", onConfirm: () => {
+          api(`/products/${id}`, { method: "DELETE" }).then(async () => {
+            toast("Product deleted");
+            const f = currentProductFilter();
+            await Promise.all([loadProductStats(), loadProducts(f.stockStatus, f.category)]);
+          }).catch(err => toast(err.message || "Delete failed", "error"));
+        }});
       }
     });
   }
@@ -1770,17 +1772,17 @@ async function loadHistory() {
         const badge = s.status === "saved" ? "green" : "amber";
         const label = s.status === "saved" ? t("common.saved") : t("common.needsReview");
         const clickAttr = s.status === "needs_review" ? `onclick="openScanReview('${s.id}')" style="cursor:pointer;"` : "";
-        return `<div class="card hist-row" ${clickAttr}>
-          <label class="scan-checkbox-label" onclick="event.stopPropagation()">
-            <input type="checkbox" value="${s.id}" class="scan-checkbox" onchange="toggleBulkDeleteBtn()" style="margin-right:8px; transform:scale(1.3); cursor:pointer;" />
+        return `<div class="card hist-row" ${clickAttr} style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:10px;background:var(--card,#fff);box-shadow:var(--shadow-card);font-size:13px;min-height:44px;">
+          <label class="scan-checkbox-label" onclick="event.stopPropagation()" style="flex-shrink:0;">
+            <input type="checkbox" value="${s.id}" class="scan-checkbox" onchange="toggleBulkDeleteBtn()" style="margin-right:6px; transform:scale(1.1); cursor:pointer;" />
           </label>
-          <span class="hist-date"><b>${day}</b><span>${my}</span></span>
-          <span class="thumb"></span>
-          <span class="mid"><b>${s.recordCount} ${t("common.records")}</b><span>${
+          <span class="hist-date" style="font-size:10px;color:var(--ink-soft,#777);min-width:42px;line-height:1.2;"><b style="font-size:14px;color:var(--ink,#12241D);">${day}</b><span style="display:block;">${my}</span></span>
+          <span class="thumb" style="width:28px;height:28px;border-radius:6px;background:var(--gray-tint,#f0eee6);flex-shrink:0;"></span>
+          <span class="mid" style="flex:1;min-width:0;line-height:1.3;"><b style="font-size:13px;color:var(--ink,#12241D);">${s.recordCount} ${t("common.records")}</b><span style="font-size:11px;color:var(--ink-soft,#777);display:block;">${
           s.status === "saved" ? t("common.verified") : t("common.needsReviewLower")
         }</span></span>
-          <span class="badge ${badge}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${label}</span>
-        <button class="mini-btn ghost" onclick="event.stopPropagation(); deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:auto;">✕</button>
+          <span class="badge ${badge}" style="font-size:10px;padding:2px 6px;border-radius:8px;flex-shrink:0;">${label}</span>
+          <button class="mini-btn ghost" onclick="event.stopPropagation(); deleteScanById('${s.id}', this)" aria-label="Delete scan" style="margin-left:2px;padding:2px 4px;font-size:11px;">✕</button>
         </div>`;
       })
       .join("");
@@ -1969,9 +1971,8 @@ window.toggleBulkDeleteBtn = function() {
 window.bulkDeleteSelected = async function() {
   const checkboxes = document.querySelectorAll(".scan-checkbox:checked");
   if (!checkboxes.length) return;
-  if (!confirm("Are you sure you want to delete the selected scans?")) return;
-  
-  const ids = Array.from(checkboxes).map(c => c.value);
+  openConfirmModal({ title: "Delete selected scans", message: "Are you sure you want to delete the selected scans?", onConfirm: async () => {
+    const ids = Array.from(checkboxes).map(c => c.value);
   for (const id of ids) {
     try {
       await api(`/scans/${id}`, { method: "DELETE" });
@@ -1982,6 +1983,7 @@ window.bulkDeleteSelected = async function() {
   toast(`Deleted ${ids.length} scans`);
   loadHistory().catch(console.error);
   toggleBulkDeleteBtn(); // hide button again
+  }});
 };
 
 /* ---------------- utils ---------------- */
@@ -2146,6 +2148,26 @@ function openEditProductModal(product) {
         toast(err.message || "Update failed", "error");
       }
     },
+  });
+}
+
+function openConfirmModal({ title, message, onConfirm }) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `<div class="modal" style="max-width:300px;">
+    <h3 class="modal-title">${escapeHtml(title || "Confirm")}</h3>
+    <div class="modal-body" style="font-size:14px;color:var(--ink-soft,#555);line-height:1.5;">${escapeHtml(message || "Are you sure?")}</div>
+    <div class="modal-actions">
+      <button type="button" class="btn link-btn" data-cancel>${t("common.cancel")}</button>
+      <button type="button" class="btn btn-primary" data-confirm>${t("common.save")}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector("[data-cancel]").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector("[data-confirm]").addEventListener("click", () => {
+    overlay.remove();
+    if (onConfirm) onConfirm();
   });
 }
 

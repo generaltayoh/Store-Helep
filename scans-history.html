@@ -14,11 +14,11 @@
   <main class="app has-nav">
 
     <section class="history-page">
-      <div class="back-alone" style="margin:24px 0 12px; display:flex; justify-content:space-between; align-items:center;">
-        <button class="back-btn" data-nav="scan.html" aria-label="Back">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      <div class="back-alone" style="margin:16px 0 10px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <button class="back-btn" data-nav="scan.html" aria-label="Back" style="flex-shrink:0; width:36px; height:36px; padding:4px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
         </button>
-        <button class="btn btn-secondary" id="bulkDeleteBtn" onclick="bulkDeleteSelected()" style="display:none; color:#b23b3b; border-color:#b23b3b; padding: 4px 12px; font-size: 13px;">Delete Selected</button>
+        <button class="btn btn-secondary" id="bulkDeleteBtn" onclick="bulkDeleteSelected()" style="display:none; color:#b23b3b; border-color:#b23b3b; padding: 3px 10px; font-size: 11px; white-space:nowrap; flex-shrink:0;">Delete Selected</button>
       </div>
 
       <h1 class="page-title" data-i18n="history.title">Previous scans</h1>
