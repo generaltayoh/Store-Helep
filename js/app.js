@@ -414,7 +414,7 @@ function toast(msg, type = "info") {
     background:${type === "error" ? "#b23b3b" : "#1f3d2b"};color:#fff;padding:10px 16px;
     border-radius:10px;font:500 13px Poppins,sans-serif;z-index:9999;max-width:80%;text-align:center;`;
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2800);
+  setTimeout(() => t.remove(), 5000);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -16,62 +16,6 @@ import { supabaseService } from "./supabaseService.js";
  * is agnostic to where the extraction comes from.
  */
 
-const FALLBACK_ITEMS = [
-  { name: "Mineral Water 1.5L", unitPrice: 400 },
-  { name: "Bread Loaf", unitPrice: 500 },
-  { name: "Sugar 1kg", unitPrice: 900 },
-  { name: "Soap Bar", unitPrice: 350 },
-  { name: "Cooking Oil 1L", unitPrice: 1500 },
-];
-
-function pickProducts(n) {
-  const pool = db.products.length > 0 ? db.products : FALLBACK_ITEMS;
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const p = pool[(Math.random() * pool.length) | 0];
-    if (!p) continue;
-    out.push({
-      productName: p.name,
-      quantity: 1 + ((Math.random() * 6) | 0),
-      unitPrice: p.unitPrice,
-      confidence: Number((0.7 + Math.random() * 0.29).toFixed(2)),
-    });
-  }
-  return out;
-}
-
-// Mock extractor — returns plausible rows with a confidence score.
-function mockExtract(imageBuffer, fileName, recordMethod = "Notebook") {
-  let count = 3 + ((Math.random() * 6) | 0); // 3..8 records
-  if (recordMethod === "Receipts") {
-    count = 2 + ((Math.random() * 3) | 0); // fewer, cleaner items
-  } else if (recordMethod === "Spreadsheet") {
-    count = 4 + ((Math.random() * 5) | 0); // more structured items
-  } else if (recordMethod === "Other") {
-    count = 3 + ((Math.random() * 4) | 0); // mixed/unclear format
-  }
-  const rows = pickProducts(count).map((r) => ({
-    ...r,
-    date: new Date(),
-  }));
-  // Adjust confidence and unknown injection based on method
-  let injectUnknown = true;
-  if (recordMethod === "Receipts") injectUnknown = Math.random() < 0.3;
-  else if (recordMethod === "Spreadsheet") injectUnknown = Math.random() < 0.1;
-  else if (recordMethod === "Other") injectUnknown = Math.random() < 0.45; // mixed uncertainty
-  else injectUnknown = Math.random() < 0.6; // Notebook: high chance
-
-  if (injectUnknown && rows.length) {
-    rows[0] = {
-      ...rows[0],
-      productName: "Unknown item",
-      unitPrice: 0,
-      confidence: Number((0.3 + Math.random() * 0.2).toFixed(2)),
-    };
-  }
-  return rows;
-}
-
 function guessMime(fileName = "") {
   const ext = fileName.split(".").pop().toLowerCase();
   if (ext === "png") return "image/png";
@@ -217,11 +161,13 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
   try {
     rows = await callAiProvider(imageBuffer, fileName, recordMethod);
   } catch (e) {
-    // Log and fall back to mock so the flow always works in development.
-    console.warn("[ocrService] AI provider unavailable, using mock:", e.message);
+    // When AI provider is unavailable, show notification and do not fall back to mock.
+    console.warn("[ocrService] AI provider unavailable:", e.message);
+    throw new Error("AI provider is currently unavailable. Please try again later.");
   }
-  // Always rely on AI extraction. If AI returns nothing, use the mock generator.
-  if (!rows) rows = mockExtract(imageBuffer, fileName, recordMethod);
+  if (!rows || rows.length === 0) {
+    throw new Error("No readable records found in the image.");
+  }
 
   // Build product catalog from system (mock DB or Supabase)
   let productCatalog = db.products || [];
