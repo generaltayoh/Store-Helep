@@ -850,4 +850,21 @@ export const supabaseService = {
       slowMoving,
     };
   },
+
+  async clearAllData(businessId) {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    const biz = await this.getBusiness();
+    const targetBizId = businessId || biz?.id;
+    if (!targetBizId) return;
+    // Get scan IDs for this business to clean child table
+    const { data: scansList } = await supabase.from("scans").select("id").eq("business_id", targetBizId);
+    const scanIds = (scansList || []).map(s => s.id);
+    if (scanIds.length > 0) {
+      await supabase.from("scan_extracted_items").delete().in("scan_id", scanIds);
+    }
+    await supabase.from("records").delete().eq("business_id", targetBizId);
+    await supabase.from("scans").delete().eq("business_id", targetBizId);
+    await supabase.from("products").delete().eq("business_id", targetBizId);
+  },
 };
