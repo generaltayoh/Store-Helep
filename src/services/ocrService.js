@@ -153,7 +153,6 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
   }
   return Array.isArray(rows) ? rows : [];
 }
-}
 
 function fuzzyMatch(name, candidates) {
   const n = (name || "").toLowerCase().trim();
