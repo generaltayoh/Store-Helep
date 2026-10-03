@@ -91,6 +91,16 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
       throw new Error("Gemini returned non-JSON content");
     }
     const rows = parsed.records || parsed.rows || [];
+    // Handle Gemini vision format (with box_2d / text_content) as fallback
+    if (Array.isArray(rows) && rows.length > 0 && rows[0].box_2d !== undefined && rows[0].text_content !== undefined) {
+      return rows.map((r) => ({
+        productName: String(r.text_content || "Unknown item"),
+        quantity: 1,
+        unitPrice: 0,
+        confidence: 0.9,
+        date: new Date(),
+      }));
+    }
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -132,7 +142,17 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
     throw new Error("AI provider returned non-JSON content");
   }
   const rows = parsed.records || parsed.rows || [];
+  if (Array.isArray(rows) && rows.length > 0 && rows[0].box_2d !== undefined && rows[0].text_content !== undefined) {
+    return rows.map((r) => ({
+      productName: String(r.text_content || "Unknown item"),
+      quantity: 1,
+      unitPrice: 0,
+      confidence: 0.9,
+      date: new Date(),
+    }));
+  }
   return Array.isArray(rows) ? rows : [];
+}
 }
 
 function fuzzyMatch(name, candidates) {
