@@ -653,7 +653,7 @@ function initCamera() {
       return;
     }
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 960 }, zoom: 1 }, audio: false });
       video.srcObject = stream;
       await video.play().catch(() => {});
       if (gate) gate.classList.add("hidden");
@@ -706,7 +706,7 @@ function initCamera() {
     if (!success && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         stream.getTracks().forEach(t => t.stop());
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", torch: torchOn }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", torch: torchOn, zoom: 1 }, audio: false });
         video.srcObject = stream;
         await video.play();
         success = true;
@@ -724,8 +724,12 @@ function initCamera() {
   if (flashBtn) flashBtn.addEventListener("click", toggleTorch);
 
   if (shutterBtn) {
-    shutterBtn.addEventListener("click", () => {
+    shutterBtn.addEventListener("click", async () => {
       if (!stream) { startCamera(); return; }
+      // Briefly activate torch at capture moment if flash is enabled
+      if (torchOn && stream) {
+        try { const track = stream.getVideoTracks()[0]; if (track) await track.applyConstraints({ torch: true }); } catch (e) {}
+      }
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth || 720;
       canvas.height = video.videoHeight || 960;

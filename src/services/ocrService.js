@@ -40,7 +40,8 @@ Respond ONLY with a JSON object of the form:
 }
 Rules:
 - productName: the item name as written (keep it short, in the original language).
-- quantity: units on that line (default 1 if not written).
+- quantity: units written on that line. Look for numbers, stroke marks (|||, ||||), plus symbols (+, ++), tally marks, or repeated lines — count them and use that total. Default to 1 only if no quantity is visible at all.
+- If quantity is shown as tally marks (e.g. 5 lines with a diagonal = 5, or |||| + ||| = 8), count them carefully and return the total number.
 - unitPrice: price per unit in the currency shown on the page (number only, no symbols).
 - date: the record date if visible, else today's date "YYYY-MM-DD".
 - Extract EVERY visible line/item. Do NOT skip items just because handwriting is unclear — read as much as possible and include it.
