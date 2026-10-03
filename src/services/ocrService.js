@@ -220,7 +220,7 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
   // Instead of filtering out unrecognised items, we keep them and flag as isUnknown
   const extracted = rows.map((r) => {
     const name = String(r.productName || "Unknown item");
-    const isMatched = productCatalog.length === 0 || fuzzyMatch(name, productCatalog);
+    const isMatched = productCatalog.length > 0 && fuzzyMatch(name, productCatalog);
     return {
       id: nextId("ext"),
       productName: name,
