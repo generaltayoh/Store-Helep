@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.113.0",
     "cors": "^2.8.5",
     "exceljs": "^4.4.0",
+    "exifreader": "^4.46.0",
     "express": "^4.19.2",
     "multer": "^2.0.0"
   },

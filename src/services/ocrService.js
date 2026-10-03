@@ -49,7 +49,17 @@ Rules:
 - Return an empty records array ONLY if the image has absolutely no readable items.`;
 
 async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") {
-  if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) return null;
+  console.log("[ocrService] config:", {
+    enabled: config.ai.enabled,
+    endpoint: config.ai.endpoint,
+    apiKeyPresent: !!config.ai.apiKey,
+    provider: config.ai.provider,
+    model: config.ai.model,
+  });
+  if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) {
+    console.warn("[ocrService] AI disabled or missing config. enabled:", config.ai.enabled, "endpoint:", config.ai.endpoint, "key:", config.ai.apiKey ? "present" : "missing");
+    return null;
+  }
   const promptWithMethod = OCR_SYSTEM_PROMPT.replace("{record_method}", recordMethod);
 
   const base64 = imageBuffer.toString("base64");
