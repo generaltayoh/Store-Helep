@@ -205,7 +205,7 @@ export async function confirmScan(req, res, next) {
             name: row.productName,
             category: "Other",
             unitPrice: row.unitPrice,
-            stockQty: row.quantity,
+            stockQty: 0,
             stockStatus: "in_stock",
           };
           db.products.push(newProduct);

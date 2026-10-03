@@ -657,7 +657,7 @@ export const supabaseService = {
         name: row.productName || row.product_name || "Unknown item",
         category: "Other",
         unitPrice: Number(row.unitPrice || row.unit_price || 0),
-        stockQty: Number(row.quantity || 1),
+        stockQty: 0,
         businessId: defaultBizId,
       });
       return newProd ? newProd.id : null;
