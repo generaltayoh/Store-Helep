@@ -1894,7 +1894,7 @@ function renderReview(scan) {
     )}</span>
       <div style="flex:2; display:flex; flex-direction:column;">
         <input class="input" data-field="productName" value="${escapeHtml(r.productName)}" style="width:100%;" />
-        ${r.isUnknown ? `<span style="display:inline-block;background:#fdf1f0;color:#b23b3b;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;margin-top:3px;border:1px solid #f5c6c4;">Not part of the system — will be added on confirm</span>` : ""}
+        ${r.isUnknown ? `` : ""}
       </div>
       <input class="input" data-field="quantity" type="number" value="${r.quantity}" style="width:60px;" />
       <input class="input" data-field="unitPrice" type="number" value="${r.unitPrice}" style="width:90px;" />`;
