@@ -65,17 +65,42 @@ function mapRecord(r) {
   };
 }
 
+function fuzzyMatch(name, candidates) {
+  const n = (name || "").toLowerCase().trim();
+  for (const c of candidates) {
+    const cn = (c.name || c.productName || "").toLowerCase().trim();
+    if (n === cn) return true;
+    if (n.includes(cn) || cn.includes(n)) return true;
+    const words = cn.split(/\s+/);
+    for (const w of words) {
+      if (w.length > 2 && n.includes(w)) return true;
+    }
+  }
+  return false;
+}
+
 // Map scan row and extracted items
-function mapScan(scan, items = []) {
+async function mapScan(scan, items = []) {
   if (!scan) return null;
-  const extracted = (items || []).map((i) => ({
-    id: i.id,
-    productName: i.product_name,
-    quantity: Number(i.quantity || 1),
-    unitPrice: Number(i.unit_price || 0),
-    date: new Date(i.date || scan.created_at),
-    confidence: Number(i.confidence || 0.9),
-  }));
+  let productCatalog = [];
+  try {
+    if (scan.business_id) {
+      productCatalog = await supabaseService.listProducts({ businessId: scan.business_id });
+    }
+  } catch (e) { /* ignore */ }
+  const extracted = (items || []).map((i) => {
+    const name = i.product_name || "Unknown item";
+    const isUnknown = productCatalog.length === 0 ? true : !fuzzyMatch(name, productCatalog);
+    return {
+      id: i.id,
+      productName: name,
+      quantity: Number(i.quantity || 1),
+      unitPrice: Number(i.unit_price || 0),
+      date: new Date(i.date || scan.created_at),
+      confidence: Number(i.confidence || 0.9),
+      isUnknown,
+    };
+  });
 
   const needsReview =
     scan.status === "needs_review" ||
@@ -576,7 +601,8 @@ export const supabaseService = {
       itemsByScanId.get(item.scan_id).push(item);
     }
 
-    return scans.map((s) => mapScan(s, itemsByScanId.get(s.id) || []));
+    const mappedScans = await Promise.all(scans.map(async (s) => await mapScan(s, itemsByScanId.get(s.id) || [])));
+    return mappedScans;
   },
 
   async getScan(id) {
