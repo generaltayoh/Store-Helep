@@ -57,6 +57,7 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
 
   // Gemini native API (required for AQ.-prefixed AI Studio keys)
   if (config.ai.provider === "gemini") {
+    console.log("[ocrService] Gemini image buffer:", imageBuffer.length, "bytes, mime:", mime);
     const body = {
       systemInstruction: { parts: [{ text: promptWithMethod }] },
       contents: [
@@ -83,6 +84,7 @@ async function callAiProvider(imageBuffer, fileName, recordMethod = "Notebook") 
     }
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log("[ocrService] Gemini raw text:", text?.slice(0, 500));
     if (!text) throw new Error("Gemini returned no content");
     let parsed;
     try {
@@ -179,6 +181,7 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
   let rows = null;
   try {
     rows = await callAiProvider(imageBuffer, fileName, recordMethod);
+    console.log("[ocrService] extracted rows:", rows?.length, JSON.stringify(rows?.slice(0, 2)));
   } catch (e) {
     // When AI provider is unavailable, show notification and do not fall back to mock.
     console.warn("[ocrService] AI provider unavailable:", e.message);
