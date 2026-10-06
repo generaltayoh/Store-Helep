@@ -217,7 +217,7 @@ export async function confirmScan(req, res, next) {
         const match = db.products.find(p => fuzzyMatch(row.productName, [p]));
         productId = match ? match.id : null;
         if (match) {
-          match.stockQty = (match.stockQty || 0) + row.quantity;
+          match.stockQty = Math.max(0, (match.stockQty || 0) - row.quantity);
         }
       }
 

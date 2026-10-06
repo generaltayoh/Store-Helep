@@ -671,8 +671,10 @@ export const supabaseService = {
     async function findOrCreateProduct(row) {
       const match = currentProducts.find(p => String(p.name).toLowerCase() === String(row.productName || row.product_name || "").toLowerCase());
       if (match) {
-        // Restock the matched product
-        await supabaseService.restockProduct(match.id, Number(row.quantity || 1));
+        // Sales reduce stock
+        const current = await supabaseService.getProduct(match.id);
+        const newStock = Math.max(0, (current?.stockQty || 0) - Number(row.quantity || 1));
+        await supabaseService.updateProduct(match.id, { stockQty: newStock });
         return match.id;
       }
       // Create new product for unknown/unmatched items
