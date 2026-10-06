@@ -57,18 +57,15 @@ CREATE INDEX idx_business_settings_business_id ON business_settings(business_id)
 CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-    sku TEXT NOT NULL,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
     unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (unit_price >= 0),
     stock_qty INTEGER NOT NULL DEFAULT 0 CHECK (stock_qty >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-    CONSTRAINT uq_products_business_sku UNIQUE (business_id, sku)
 );
 
 CREATE INDEX idx_products_business_id ON products(business_id);
-CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_category ON products(category);
 CREATE INDEX idx_products_stock_qty ON products(stock_qty);
 

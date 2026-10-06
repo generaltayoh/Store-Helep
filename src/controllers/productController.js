@@ -44,20 +44,15 @@ export async function getProductStats(req, res, next) {
 
 export async function createProductHandler(req, res, next) {
   try {
-    const { sku, name, category, unitPrice, stockQty } = req.body;
-    if (!sku || !name || !category || unitPrice === undefined) {
+    const { name, category, unitPrice, stockQty } = req.body;
+    if (!name || !category || unitPrice === undefined) {
       return res
         .status(400)
-        .json({ error: "sku, name, category and unitPrice are required." });
+        .json({ error: "name, category and unitPrice are required." });
     }
 
     if (isSupabaseConfigured()) {
-      const existing = await supabaseService.listProducts();
-      if (existing.some((p) => p.sku === sku)) {
-        return res.status(409).json({ error: "A product with this SKU already exists." });
-      }
       const product = await supabaseService.createProduct({
-        sku,
         name,
         category,
         unitPrice,
@@ -66,10 +61,7 @@ export async function createProductHandler(req, res, next) {
       return res.status(201).json({ product });
     }
 
-    if (db.products.some((p) => p.sku === sku)) {
-      return res.status(409).json({ error: "A product with this SKU already exists." });
-    }
-    const product = createProduct({ sku, name, category, unitPrice, stockQty: stockQty || 0 });
+    const product = createProduct({ name, category, unitPrice, stockQty: stockQty || 0 });
     db.products.push(product);
     res.status(201).json({ product: withStatus(product) });
   } catch (err) {

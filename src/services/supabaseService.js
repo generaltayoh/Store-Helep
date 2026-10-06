@@ -38,7 +38,6 @@ function mapProduct(p) {
   const unitPrice = Number(p.unit_price || 0);
   return {
     id: p.id,
-    sku: p.sku,
     name: p.name,
     category: p.category,
     unitPrice,
@@ -343,7 +342,7 @@ export const supabaseService = {
     return mapProduct(data);
   },
 
-  async createProduct({ sku, name, category, unitPrice, stockQty = 0, businessId }) {
+  async createProduct({ name, category, unitPrice, stockQty = 0, businessId }) {
     const supabase = getSupabaseClient();
     if (!supabase) return null;
 
@@ -358,7 +357,6 @@ export const supabaseService = {
       .from("products")
       .insert({
         business_id: targetBizId,
-        sku,
         name,
         category,
         unit_price: Number(unitPrice),
@@ -679,7 +677,6 @@ export const supabaseService = {
       }
       // Create new product for unknown/unmatched items
       const newProd = await supabaseService.createProduct({
-        sku: row.productName ? String(row.productName).substring(0, 20).replace(/\s+/g, "-") + "-" + Date.now() : "AUTO-" + Date.now(),
         name: row.productName || row.product_name || "Unknown item",
         category: "Other",
         unitPrice: Number(row.unitPrice || row.unit_price || 0),

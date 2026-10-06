@@ -98,7 +98,6 @@ export async function exportProducts(req, res, next) {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Products");
     ws.columns = [
-      { header: "SKU", key: "sku", width: 14 },
       { header: "Name", key: "name", width: 30 },
       { header: "Category", key: "category", width: 16 },
       { header: "Unit Price", key: "unitPrice", width: 14 },
@@ -109,7 +108,6 @@ export async function exportProducts(req, res, next) {
 
     for (const p of products) {
       ws.addRow({
-        sku: p.sku,
         name: p.name,
         category: p.category,
         unitPrice: p.unitPrice,

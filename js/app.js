@@ -49,6 +49,7 @@ const I18N = {
     "prod.search": "Search products", "prod.noMatch": "No products match your search.",
     "prod.inStock": "In stock", "prod.lowStock": "Low stock",
     "prod.outOfStock": "Out of stock", "prod.addTitle": "Add product",
+    "prod.sku": "SKU", "prod.skuLabel": "SKU (e.g. CC-99)",
     "prod.productName": "Product name", "prod.category": "Category",
     "prod.category": "Category", "prod.unitPrice": "Unit price (FCFA)",
     "prod.stockQty": "Stock quantity", "prod.added": "Product added",

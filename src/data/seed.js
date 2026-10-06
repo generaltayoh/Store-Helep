@@ -23,12 +23,12 @@ function categoryFor(i) {
 }
 
 const NAMED_PRODUCTS = [
-  { sku: "CC-50", name: "Coca-Cola 50Cl", category: "Drinks", unitPrice: 500, stockQty: 34 },
-  { sku: "PM-01", name: "Peak Milk Tin", category: "Groceries", unitPrice: 900, stockQty: 4 },
-  { sku: "MG-12", name: "Maggi Cube Pack", category: "Groceries", unitPrice: 1200, stockQty: 0 },
-  { sku: "RB-25", name: "Rice bag 25kg", category: "Groceries", unitPrice: 16000, stockQty: 18 },
-  { sku: "BS-10", name: "Blue Band Sachet", category: "Bakery", unitPrice: 300, stockQty: 22 },
-  { sku: "CB-05", name: "Candle Box", category: "Household", unitPrice: 750, stockQty: 3 },
+  { name: "Coca-Cola 50Cl", category: "Drinks", unitPrice: 500, stockQty: 34 },
+  { name: "Peak Milk Tin", category: "Groceries", unitPrice: 900, stockQty: 4 },
+  { name: "Maggi Cube Pack", category: "Groceries", unitPrice: 1200, stockQty: 0 },
+  { name: "Rice bag 25kg", category: "Groceries", unitPrice: 16000, stockQty: 18 },
+  { name: "Blue Band Sachet", category: "Bakery", unitPrice: 300, stockQty: 22 },
+  { name: "Candle Box", category: "Household", unitPrice: 750, stockQty: 3 },
 ];
 
 const GENERIC = [
@@ -59,7 +59,6 @@ function seedProducts() {
   for (const p of NAMED_PRODUCTS) {
     db.products.push({
       id: nextId("prod"),
-      sku: p.sku,
       name: p.name,
       category: p.category,
       unitPrice: p.unitPrice,
@@ -76,7 +75,6 @@ function seedProducts() {
     const stock = db.products.length % 11; // spread across in/low/out
     db.products.push({
       id: nextId("prod"),
-      sku: `GN-${String(db.products.length).padStart(3, "0")}`,
       name: `${base} ${idx}`,
       category: cat,
       unitPrice: price,
@@ -103,9 +101,9 @@ function addRecord({ productId, productName, quantity, unitPrice, timestamp, sou
 }
 
 function seedRecords() {
-  const coca = db.products.find((p) => p.sku === "CC-50");
-  const rice = db.products.find((p) => p.sku === "RB-25");
-  const blue = db.products.find((p) => p.sku === "BS-10");
+  const coca = db.products.find((p) => p.name === "Coca-Cola 50Cl");
+  const rice = db.products.find((p) => p.name === "Rice bag 25kg");
+  const blue = db.products.find((p) => p.name === "Blue Band Sachet");
 
   // Today
   for (let i = 0; i < 5; i++) {
@@ -152,7 +150,7 @@ function seedRecords() {
 
 function seedScans() {
   // A saved scan (already confirmed)
-  const coca = db.products.find((p) => p.sku === "CC-50");
+  const coca = db.products.find((p) => p.name === "Coca-Cola 50Cl");
   const savedScan = {
     id: nextId("scan"),
     fileName: "page-14-aug.jpg",
@@ -167,7 +165,7 @@ function seedScans() {
   db.scans.push(savedScan);
 
   // A scan awaiting review (needs_review)
-  const peak = db.products.find((p) => p.sku === "PM-01");
+  const peak = db.products.find((p) => p.name === "Peak Milk Tin");
   const reviewScan = {
     id: nextId("scan"),
     fileName: "page-15-aug.jpg",

@@ -46,10 +46,9 @@ export function productStats() {
   };
 }
 
-export function createProduct({ sku, name, category, unitPrice, stockQty = 0 }) {
+export function createProduct({ name, category, unitPrice, stockQty = 0 }) {
   const product = {
     id: nextId("prod"),
-    sku,
     name,
     category,
     unitPrice: Number(unitPrice),

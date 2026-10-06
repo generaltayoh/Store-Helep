@@ -68,7 +68,6 @@ async function main() {
 
     // Product creation
     const created1 = await json("POST", "/api/products", {
-      sku: "CC-01",
       name: "Coca-Cola 50Cl",
       category: "Drinks",
       unitPrice: 500,
@@ -77,21 +76,12 @@ async function main() {
     check("create product 1", created1.status === 201 && created1.data.product.id);
 
     const created2 = await json("POST", "/api/products", {
-      sku: "RB-01",
       name: "Rice bag 25kg",
       category: "Groceries",
       unitPrice: 16000,
       stockQty: 3,
     });
     check("create product 2 (low stock)", created2.status === 201 && created2.data.product.stockStatus === "low_stock");
-
-    const dup = await json("POST", "/api/products", {
-      sku: "CC-01",
-      name: "Duplicate",
-      category: "Drinks",
-      unitPrice: 500,
-    });
-    check("duplicate sku rejected", dup.status === 409);
 
     // Edit product
     const edit = await json("PATCH", `/api/products/${created1.data.product.id}`, {
