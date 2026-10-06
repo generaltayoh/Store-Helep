@@ -27,7 +27,7 @@ function loadEnv() {
 loadEnv();
 
 const LOW_STOCK_THRESHOLD = 5;
-const ESTIMATED_PROFIT_MARGIN = 0.33;
+const ESTIMATED_PROFIT_MARGIN = 0.15;
 
 export const config = {
   port: Number(process.env.PORT) || 3000,
