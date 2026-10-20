@@ -6,15 +6,15 @@ import {
   createProduct,
   findProduct,
 } from "../services/inventoryService.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 export async function getProducts(req, res, next) {
   try {
     const { category, stockStatus } = req.query;
 
-    if (isSupabaseConfigured()) {
-      const products = await supabaseService.listProducts({ category, stockStatus, businessId: req.businessId });
+    if (isDbConfigured()) {
+      const products = await dbService.listProducts({ category, stockStatus, businessId: req.businessId });
       return res.json({ products, count: products.length });
     }
 
@@ -30,8 +30,8 @@ export async function getProducts(req, res, next) {
 
 export async function getProductStats(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const stats = await supabaseService.getProductStats();
+    if (isDbConfigured()) {
+      const stats = await dbService.getProductStats();
       return res.json({ ...stats });
     }
 
@@ -51,8 +51,8 @@ export async function createProductHandler(req, res, next) {
         .json({ error: "name, category and unitPrice are required." });
     }
 
-    if (isSupabaseConfigured()) {
-      const product = await supabaseService.createProduct({
+    if (isDbConfigured()) {
+      const product = await dbService.createProduct({
         name,
         category,
         unitPrice,
@@ -71,8 +71,8 @@ export async function createProductHandler(req, res, next) {
 
 export async function getProduct(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const product = await supabaseService.getProduct(req.params.id);
+    if (isDbConfigured()) {
+      const product = await dbService.getProduct(req.params.id);
       if (!product) return res.status(404).json({ error: "Product not found." });
       return res.json({ product });
     }
@@ -89,10 +89,10 @@ export async function updateProduct(req, res, next) {
   try {
     const { name, category, unitPrice, stockQty } = req.body;
 
-    if (isSupabaseConfigured()) {
-      const product = await supabaseService.getProduct(req.params.id);
+    if (isDbConfigured()) {
+      const product = await dbService.getProduct(req.params.id);
       if (!product) return res.status(404).json({ error: "Product not found." });
-      const updated = await supabaseService.updateProduct(req.params.id, {
+      const updated = await dbService.updateProduct(req.params.id, {
         name,
         category,
         unitPrice,
@@ -115,15 +115,11 @@ export async function updateProduct(req, res, next) {
 
 export async function deleteProduct(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const product = await supabaseService.getProduct(req.params.id);
+    if (isDbConfigured()) {
+      const product = await dbService.getProduct(req.params.id);
       if (!product) return res.status(404).json({ error: "Product not found." });
-      const supabase = (await import("../config/supabase.js")).getSupabaseClient();
-      if (supabase) {
-        const { error } = await supabase.from("products").delete().eq("id", req.params.id);
-        if (error) throw error;
-        return res.status(204).send();
-      }
+      await dbService.deleteProduct(req.params.id);
+      return res.status(204).send();
     }
     const idx = db.products.findIndex((p) => p.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: "Product not found." });
@@ -141,10 +137,10 @@ export async function restockProduct(req, res, next) {
       return res.status(400).json({ error: "addQty must be a positive number." });
     }
 
-    if (isSupabaseConfigured()) {
-      const product = await supabaseService.getProduct(req.params.id);
+    if (isDbConfigured()) {
+      const product = await dbService.getProduct(req.params.id);
       if (!product) return res.status(404).json({ error: "Product not found." });
-      const updated = await supabaseService.restockProduct(req.params.id, addQty);
+      const updated = await dbService.restockProduct(req.params.id, addQty);
       return res.json({ product: updated });
     }
 

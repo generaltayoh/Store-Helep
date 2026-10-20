@@ -1,14 +1,14 @@
 import { db } from "../data/store.js";
 import { normalizeLang } from "../services/currency.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 export async function getBusiness(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const biz = req.business ? { id: req.businessId, ...req.business } : await supabaseService.getBusiness(req.businessId);
+    if (isDbConfigured()) {
+      const biz = req.business ? { id: req.businessId, ...req.business } : await dbService.getBusiness(req.businessId);
       if (!biz && req.businessId) {
-        const fetched = await supabaseService.getBusinessById(req.businessId);
+        const fetched = await dbService.getBusinessById(req.businessId);
         if (!fetched) return res.status(404).json({ error: "Business not found." });
         return res.json({ business: fetched });
       }
@@ -27,11 +27,11 @@ export async function updateBusiness(req, res, next) {
   try {
     const { name, phone, type, currency, location, language, darkMode } = req.body;
 
-    if (isSupabaseConfigured()) {
-      let biz = await supabaseService.getBusiness(req.businessId);
+    if (isDbConfigured()) {
+      let biz = await dbService.getBusiness(req.businessId);
       if (!biz) return res.status(404).json({ error: "Business not found." });
 
-      const updated = await supabaseService.updateBusiness(biz.id, {
+      const updated = await dbService.updateBusiness(biz.id, {
         name,
         email: phone,
         type,

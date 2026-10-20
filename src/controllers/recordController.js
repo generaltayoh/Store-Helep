@@ -1,7 +1,7 @@
 import { db, nextId } from "../data/store.js";
 import { resolveRange } from "../services/analyticsService.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -42,8 +42,8 @@ export async function listRecords(req, res, next) {
     const { filter = "all", from, to } = req.query;
 
     let records = [];
-    if (isSupabaseConfigured()) {
-      records = await supabaseService.listRecords({ filter, from, to });
+    if (isDbConfigured()) {
+      records = await dbService.listRecords({ filter, from, to });
     } else {
       records = filterRecords(filter, from, to);
       records.sort((a, b) => b.timestamp - a.timestamp);
@@ -80,8 +80,8 @@ export async function listRecords(req, res, next) {
 
 export async function getRecord(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const record = await supabaseService.getRecord(req.params.id);
+    if (isDbConfigured()) {
+      const record = await dbService.getRecord(req.params.id);
       if (!record) return res.status(404).json({ error: "Record not found." });
       return res.json({ record });
     }
@@ -104,8 +104,8 @@ export async function createRecord(req, res, next) {
         .json({ error: "productName, quantity and unitPrice are required." });
     }
 
-    if (isSupabaseConfigured()) {
-      const record = await supabaseService.createRecord({
+    if (isDbConfigured()) {
+      const record = await dbService.createRecord({
         productId,
         productName,
         quantity: Number(quantity),
@@ -140,11 +140,11 @@ export async function updateRecord(req, res, next) {
   try {
     const { productName, quantity, unitPrice, status } = req.body;
 
-    if (isSupabaseConfigured()) {
-      const existing = await supabaseService.getRecord(req.params.id);
+    if (isDbConfigured()) {
+      const existing = await dbService.getRecord(req.params.id);
       if (!existing) return res.status(404).json({ error: "Record not found." });
 
-      const updated = await supabaseService.updateRecord(req.params.id, {
+      const updated = await dbService.updateRecord(req.params.id, {
         productName,
         quantity,
         unitPrice,

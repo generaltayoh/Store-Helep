@@ -1,19 +1,16 @@
 import { config } from "../config/index.js";
 import { db, nextId } from "../data/store.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "./supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "./dbService.js";
 
 /*
  * OCR / AI extraction service.
  *
  * This is the single integration seam for turning a record-page photo into
- * structured data. Today it uses a mock extractor so the full
- * scan -> review -> confirm flow is exercisable without an external provider.
- *
- * To integrate a real AI/OCR provider later, implement `callAiProvider`
- * (e.g. POST the image to a vision/LLM endpoint and parse JSON) and set
- * AI_OCR_ENDPOINT / AI_OCR_API_KEY in the environment. The rest of the app
- * is agnostic to where the extraction comes from.
+ * structured data, using the configured AI/OCR provider (Gemini or an
+ * OpenAI-compatible vision endpoint). When the provider is unavailable,
+ * unconfigured, or finds nothing readable, a clear error is returned —
+ * there is no mock/fake extraction fallback.
  */
 
 function guessMime(fileName = "") {
@@ -198,19 +195,22 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
     console.warn("[ocrService] AI provider unavailable:", e.message);
     throw new Error("AI provider is currently unavailable. Please try again later.");
   }
+  if (rows === null) {
+    throw new Error("AI OCR is not enabled or configured.");
+  }
   if (!rows || rows.length === 0) {
     throw new Error("No readable records found in the image.");
   }
 
-  // Build product catalog from system (mock DB or Supabase)
+  // Build product catalog from system (mock DB or PostgreSQL)
   let productCatalog = db.products || [];
-  if (isSupabaseConfigured() && supabaseService) {
+  if (isDbConfigured() && dbService) {
     try {
-      const biz = await supabaseService.getBusiness();
+      const biz = await dbService.getBusiness();
       const bizId = biz?.id;
       if (bizId) {
-        const supaProds = await supabaseService.listProducts({ businessId: bizId });
-        if (supaProds && supaProds.length > 0) productCatalog = supaProds;
+        const dbProds = await dbService.listProducts({ businessId: bizId });
+        if (dbProds && dbProds.length > 0) productCatalog = dbProds;
       }
     } catch (e) {
       // Ignore; fall back to db.products

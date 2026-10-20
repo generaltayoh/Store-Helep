@@ -36,16 +36,16 @@ app.use("/api/export", exportRoutes);
 app.use(express.static(projectRoot));
 
 import { db, resetStore } from "./data/store.js";
-import { isSupabaseConfigured } from "./config/supabase.js";
-import { supabaseService } from "./services/supabaseService.js";
+import { isDbConfigured } from "./config/db.js";
+import { dbService } from "./services/dbService.js";
 
 app.post("/api/clear", async (_req, res) => {
   resetStore();
-  if (isSupabaseConfigured()) {
+  if (isDbConfigured()) {
     try {
-      await supabaseService.clearAllData();
+      await dbService.clearAllData();
     } catch (e) {
-      console.error("[clear] Supabase clear failed:", e.message);
+      console.error("[clear] Database clear failed:", e.message);
     }
   }
   res.json({ cleared: true });

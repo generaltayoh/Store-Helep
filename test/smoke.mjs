@@ -1,5 +1,8 @@
-import { app } from "../src/app.js";
-import { resetStore } from "../src/data/store.js";
+// Force mock (in-memory) mode: skip .env so DATABASE_URL is never loaded.
+process.env.SKIP_ENV_FILE = "true";
+
+const { app } = await import("../src/app.js");
+const { resetStore } = await import("../src/data/store.js");
 
 let passed = 0;
 let failed = 0;
@@ -48,7 +51,7 @@ async function main() {
     // Auth / onboarding fresh business setup
     const setup = await json("POST", "/api/auth/setup", {
       name: "Divine Grace Store",
-      email: "divine@grace.com",
+      phone: "+237612345678",
       type: "Provision store",
       currency: "FCFA",
       location: "Limbe, Cameroon",
@@ -62,7 +65,7 @@ async function main() {
     // Login with existing credentials
     const login = await json("POST", "/api/auth/login", {
       businessName: "Divine Grace Store",
-      businessEmail: "divine@grace.com",
+      businessPhone: "+237612345678",
     });
     check("login returns token", login.status === 200 && !!login.data.token);
 
@@ -109,7 +112,8 @@ async function main() {
     });
     check("manual record creation", manual.status === 201 && manual.data.record.amount === 2200);
 
-    // Scanning flow (multipart upload -> mock OCR -> review -> confirm)
+    // Scanning flow (multipart upload -> OCR). With OCR disabled/unconfigured the
+    // API must fail with a clear error — no fake/mock records may be returned.
     const fakeImage = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
       "base64"
@@ -118,27 +122,37 @@ async function main() {
     fd.append("image", new Blob([fakeImage], { type: "image/jpeg" }), "sales_page.jpg");
     const scanRes = await fetch(`${BASE}/api/scans`, { method: "POST", body: fd });
     const scanData = await scanRes.json();
-    check("scan upload + extract", scanRes.status === 201 && Array.isArray(scanData.extracted) && scanData.extracted.length > 0);
 
-    const scanId = scanData.id;
-    const targetRow = scanData.extracted[0];
-    const fixed = await json("PATCH", `/api/scans/${scanId}/records/${targetRow.id}`, {
-      productName: "Rice bag 25kg",
-      quantity: 1,
-      unitPrice: 16000,
-    });
-    check("edit extracted scan row", fixed.status === 200);
+    if (scanRes.status === 201) {
+      // Real OCR is enabled: exercise the full review -> confirm flow.
+      check("scan upload + extract", Array.isArray(scanData.extracted) && scanData.extracted.length > 0);
 
-    const confirm = await json("POST", `/api/scans/${scanId}/confirm`);
-    check("confirm scan commits records", confirm.status === 200 && confirm.data.recordsCreated > 0);
-    check("scan status saved", confirm.data.scan.status === "saved");
+      const scanId = scanData.id;
+      const targetRow = scanData.extracted[0];
+      const fixed = await json("PATCH", `/api/scans/${scanId}/records/${targetRow.id}`, {
+        productName: "Rice bag 25kg",
+        quantity: 1,
+        unitPrice: 16000,
+      });
+      check("edit extracted scan row", fixed.status === 200);
 
-    const duplicateConfirm = await json("POST", `/api/scans/${scanId}/confirm`);
-    check("double confirm blocked", duplicateConfirm.status === 409);
+      const confirm = await json("POST", `/api/scans/${scanId}/confirm`);
+      check("confirm scan commits records", confirm.status === 200 && confirm.data.recordsCreated > 0);
+      check("scan status saved", confirm.data.scan.status === "saved");
 
-    // Records listing & day grouping
+      const duplicateConfirm = await json("POST", `/api/scans/${scanId}/confirm`);
+      check("double confirm blocked", duplicateConfirm.status === 409);
+    } else {
+      // OCR disabled: must be a clear error, never fake extracted rows.
+      check(
+        "scan upload rejected with clear error when OCR unavailable",
+        scanRes.status >= 400 && typeof scanData.error === "string" && !Array.isArray(scanData.extracted)
+      );
+    }
+
+    // Records listing & day grouping (at least the manual record from above)
     const recToday = await json("GET", "/api/records?filter=today");
-    check("records today grouped", recToday.status === 200 && Array.isArray(recToday.data.groups) && recToday.data.count >= 2);
+    check("records today grouped", recToday.status === 200 && Array.isArray(recToday.data.groups) && recToday.data.count >= 1);
 
     // Dashboard with confirmed sales
     const dash = await json("GET", "/api/dashboard?lang=en");

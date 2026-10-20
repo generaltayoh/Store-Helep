@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import { db, nextId } from "../data/store.js";
 import { isPhone } from "../middleware/validate.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 function publicBusiness() {
   if (!db.business) return null;
@@ -22,12 +22,12 @@ export async function login(req, res, next) {
 
     const token = randomUUID();
 
-    if (isSupabaseConfigured()) {
-      const biz = await supabaseService.findBusinessByNameAndPhone(businessName, businessPhone);
+    if (isDbConfigured()) {
+      const biz = await dbService.findBusinessByNameAndPhone(businessName, businessPhone);
       if (!biz) {
         return res.status(401).json({ error: "Business not found. Check your name and phone number." });
       }
-      const updated = await supabaseService.updateBusiness(biz.id, {
+      const updated = await dbService.updateBusiness(biz.id, {
         email: businessPhone,
         token,
       });
@@ -58,9 +58,9 @@ export async function setup(req, res, next) {
       return res.status(400).json({ error: "Invalid business phone." });
     }
 
-    if (isSupabaseConfigured()) {
-      const byName = await supabaseService.findByName(name);
-      const byPhone = await supabaseService.findByPhone(phone);
+    if (isDbConfigured()) {
+      const byName = await dbService.findByName(name);
+      const byPhone = await dbService.findByPhone(phone);
       if (byName && byPhone) {
         return res.status(409).json({ error: "This business name and phone are already registered." });
       } else if (byName) {
@@ -68,12 +68,12 @@ export async function setup(req, res, next) {
       } else if (byPhone) {
         return res.status(409).json({ error: "This business phone is already registered." });
       }
-      const biz = await supabaseService.loginBusiness({
+      const biz = await dbService.loginBusiness({
         businessName: name || "Mama General Store",
         businessEmail: phone || "+1234567890",
         token: randomUUID(),
       });
-      const updated = await supabaseService.updateBusiness(biz.id, {
+      const updated = await dbService.updateBusiness(biz.id, {
         name,
         email: phone,
         type,
@@ -126,12 +126,12 @@ export async function setRecordMethod(req, res, next) {
       return res.status(400).json({ error: "Invalid record method." });
     }
 
-    if (isSupabaseConfigured()) {
-      const biz = await supabaseService.getBusiness();
+    if (isDbConfigured()) {
+      const biz = await dbService.getBusiness();
       if (!biz) {
         return res.status(400).json({ error: "Business not set up yet." });
       }
-      const updated = await supabaseService.updateBusiness(biz.id, { recordMethod: method });
+      const updated = await dbService.updateBusiness(biz.id, { recordMethod: method });
       return res.json({ business: updated });
     }
 

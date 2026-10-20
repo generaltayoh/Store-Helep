@@ -2,8 +2,8 @@ import ExcelJS from "exceljs";
 import { db } from "../data/store.js";
 import { resolveRange } from "../services/analyticsService.js";
 import { withStatus } from "../services/inventoryService.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 function filterRecordsForExport(filter, from, to) {
   switch (filter) {
@@ -35,8 +35,8 @@ export async function exportRecords(req, res, next) {
     const { filter = "all", from, to } = req.query;
     let records = [];
 
-    if (isSupabaseConfigured()) {
-      records = await supabaseService.listRecords({ filter, from, to });
+    if (isDbConfigured()) {
+      records = await dbService.listRecords({ filter, from, to });
     } else {
       records = filterRecordsForExport(filter, from, to).sort(
         (a, b) => b.timestamp - a.timestamp
@@ -84,8 +84,8 @@ export async function exportProducts(req, res, next) {
     const { category, stockStatus } = req.query;
     let products = [];
 
-    if (isSupabaseConfigured()) {
-      products = await supabaseService.listProducts({ category, stockStatus });
+    if (isDbConfigured()) {
+      products = await dbService.listProducts({ category, stockStatus });
     } else {
       products = db.products;
       if (category) products = products.filter((p) => p.category === category);

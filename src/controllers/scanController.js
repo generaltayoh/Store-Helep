@@ -1,8 +1,7 @@
 import { db, nextId } from "../data/store.js";
 import { extractRecords } from "../services/ocrService.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { getSupabaseClient } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 // Basic fuzzy match function reproduced here to easily match products
 function fuzzyMatch(name, candidates) {
@@ -20,10 +19,10 @@ function fuzzyMatch(name, candidates) {
 }
 
 function serializeScan(scan) {
-  // Ensure each extracted row has isUnknown computed (for mock DB it's set by ocrService; for Supabase we enrich here if needed).
+  // Ensure each extracted row has isUnknown computed (for mock DB it's set by ocrService; for PostgreSQL we enrich here if needed).
   const enriched = (scan.extracted || []).map((r) => {
     if (r.isUnknown !== undefined) return r;
-    // Fallback: we don't have products here synchronously; controllers for Supabase will enrich before calling serializeScan.
+    // Fallback: we don't have products here synchronously; database-backed controllers will enrich before calling serializeScan.
     return { ...r, isUnknown: false };
   });
   return {
@@ -49,14 +48,14 @@ export async function uploadScan(req, res, next) {
       return res.status(400).json({ error: "No image uploaded. Send field 'image'." });
     }
     let recordMethod = "Notebook";
-    if (isSupabaseConfigured()) {
-      const biz = await supabaseService.getBusiness();
+    if (isDbConfigured()) {
+      const biz = await dbService.getBusiness();
       recordMethod = biz?.recordMethod || "Notebook";
     }
     const { extracted } = await extractRecords(req.file.buffer, req.file.originalname, recordMethod);
 
-    if (isSupabaseConfigured()) {
-      const scan = await supabaseService.createScan({
+    if (isDbConfigured()) {
+      const scan = await dbService.createScan({
         fileName: req.file.originalname,
         extracted,
       });
@@ -79,8 +78,8 @@ export async function uploadScan(req, res, next) {
 
 export async function listScans(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const scans = await supabaseService.listScans();
+    if (isDbConfigured()) {
+      const scans = await dbService.listScans();
       return res.json({ scans: scans.map(serializeScan) });
     }
 
@@ -95,8 +94,8 @@ export async function listScans(req, res, next) {
 
 export async function getScan(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const scan = await supabaseService.getScan(req.params.id);
+    if (isDbConfigured()) {
+      const scan = await dbService.getScan(req.params.id);
       if (!scan) return res.status(404).json({ error: "Scan not found." });
       return res.json(serializeScan(scan));
     }
@@ -114,13 +113,13 @@ export async function updateExtractedRow(req, res, next) {
   try {
     const { productName, quantity, unitPrice, date } = req.body;
 
-    if (isSupabaseConfigured()) {
-      const scan = await supabaseService.getScan(req.params.id);
+    if (isDbConfigured()) {
+      const scan = await dbService.getScan(req.params.id);
       if (!scan) return res.status(404).json({ error: "Scan not found." });
       const row = scan.extracted.find((r) => r.id === req.params.rid);
       if (!row) return res.status(404).json({ error: "Extracted row not found." });
 
-      const updatedScan = await supabaseService.updateExtractedRow(
+      const updatedScan = await dbService.updateExtractedRow(
         req.params.id,
         req.params.rid,
         {
@@ -154,13 +153,9 @@ export async function updateExtractedRow(req, res, next) {
 
 export async function deleteScan(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = getSupabaseClient();
-      if (supabase) {
-        await supabase.from("scans").delete().eq("id", req.params.id);
-        return res.status(204).send();
-      }
-      // If Supabase client can't be created, fall through to mock delete
+    if (isDbConfigured()) {
+      await dbService.deleteScan(req.params.id);
+      return res.status(204).send();
     }
     const idx = db.scans.findIndex((s) => s.id === req.params.id);
     if (idx !== -1) db.scans.splice(idx, 1);
@@ -173,13 +168,13 @@ export async function deleteScan(req, res, next) {
 // Commit extracted rows as official business records (source: scanned).
 export async function confirmScan(req, res, next) {
   try {
-    if (isSupabaseConfigured()) {
-      const scan = await supabaseService.getScan(req.params.id);
+    if (isDbConfigured()) {
+      const scan = await dbService.getScan(req.params.id);
       if (!scan) return res.status(404).json({ error: "Scan not found." });
       if (scan.status === "saved") {
         return res.status(409).json({ error: "Scan already confirmed." });
       }
-      const result = await supabaseService.confirmScan(req.params.id);
+      const result = await dbService.confirmScan(req.params.id);
       return res.json({
         scan: serializeScan(result.scan),
         recordsCreated: result.recordsCreated,

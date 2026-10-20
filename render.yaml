@@ -14,6 +14,8 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: true
       - key: OCR_ENABLED
         value: "true"
       - key: OCR_PROVIDER

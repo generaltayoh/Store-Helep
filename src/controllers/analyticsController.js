@@ -1,15 +1,15 @@
 import { analytics } from "../services/analyticsService.js";
 import { formatCurrency } from "../services/currency.js";
-import { isSupabaseConfigured } from "../config/supabase.js";
-import { supabaseService } from "../services/supabaseService.js";
+import { isDbConfigured } from "../config/db.js";
+import { dbService } from "../services/dbService.js";
 
 export async function getAnalytics(req, res, next) {
   try {
     const { range, from, to, productId, lang } = req.query;
     let data;
 
-    if (isSupabaseConfigured()) {
-      data = await supabaseService.analytics({ range, from, to, productId, businessId: req.businessId });
+    if (isDbConfigured()) {
+      data = await dbService.analytics({ range, from, to, productId, businessId: req.businessId });
     } else {
       data = analytics({ range, from, to, productId });
     }

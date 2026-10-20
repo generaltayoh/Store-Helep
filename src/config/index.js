@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 // of process.env by default. Only sets vars that are not already defined.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function loadEnv() {
+  if (process.env.SKIP_ENV_FILE === "true") return;
   const envPath = path.resolve(__dirname, "..", "..", ".env");
   if (!fs.existsSync(envPath)) return;
   for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
@@ -65,9 +66,8 @@ export const config = {
     enabled: process.env.OCR_ENABLED === "true",
     apiKey: process.env.OCR_API_KEY || process.env.AI_OCR_API_KEY || null,
   },
-  supabase: {
-    url: process.env.SUPABASE_URL || null,
-    anonKey: process.env.SUPABASE_ANON_KEY || null,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || null,
+  database: {
+    url: process.env.DATABASE_URL || null,
+    ssl: process.env.DB_SSL !== "false",
   },
 };

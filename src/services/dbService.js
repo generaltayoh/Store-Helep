@@ -1,6 +1,6 @@
-import { getSupabaseClient, isSupabaseConfigured } from "../config/supabase.js";
+import { query, getPool } from "../config/db.js";
 import { config } from "../config/index.js";
-import { stockStatus, withStatus } from "./inventoryService.js";
+import { stockStatus } from "./inventoryService.js";
 import { resolveRange } from "./analyticsService.js";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ async function mapScan(scan, items = []) {
   let productCatalog = [];
   try {
     if (scan.business_id) {
-      productCatalog = await supabaseService.listProducts({ businessId: scan.business_id });
+      productCatalog = await dbService.listProducts({ businessId: scan.business_id });
     }
   } catch (e) { /* ignore */ }
   const extracted = (items || []).map((i) => {
@@ -119,168 +119,150 @@ async function mapScan(scan, items = []) {
   };
 }
 
-export const supabaseService = {
+async function withTransaction(fn) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export const dbService = {
   // --------------------------------------------------------------------------
   // Business & Settings
   // --------------------------------------------------------------------------
   async getBusiness(businessId) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
-    let query = supabase.from("businesses").select("*");
-    if (businessId) query = query.eq("id", businessId);
-    else query = query.order("created_at", { ascending: true }).limit(1);
-    const { data: biz, error: bizErr } = await query.maybeSingle();
-
-    if (bizErr) throw bizErr;
+    let biz = null;
+    if (businessId) {
+      const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [businessId]);
+      biz = rows[0] || null;
+    } else {
+      const { rows } = await query("SELECT * FROM businesses ORDER BY created_at ASC LIMIT 1");
+      biz = rows[0] || null;
+    }
     if (!biz) return null;
 
-    const { data: settings } = await supabase
-      .from("business_settings")
-      .select("*")
-      .eq("business_id", biz.id)
-      .maybeSingle();
+    const { rows } = await query("SELECT * FROM business_settings WHERE business_id = $1", [biz.id]);
+    return mapBusiness(biz, rows[0]);
+  },
 
-    return mapBusiness(biz, settings);
+  async findBusinessByToken(token) {
+    if (!getPool()) return null;
+    const { rows } = await query(
+      "SELECT id, name, email, token, type, currency, location, record_method, created_at, updated_at FROM businesses WHERE token = $1",
+      [token]
+    );
+    return rows[0] || null;
   },
 
   async findBusinessByNameAndPhone(name, phone) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
-    const { data: biz, error } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("name", name)
-      .eq("email", phone)
-      .maybeSingle();
-    if (error) throw error;
+    if (!getPool()) return null;
+    const { rows } = await query("SELECT * FROM businesses WHERE name = $1 AND email = $2", [name, phone]);
+    const biz = rows[0] || null;
     if (!biz) return null;
-    const { data: settings } = await supabase
-      .from("business_settings")
-      .select("*")
-      .eq("business_id", biz.id)
-      .maybeSingle();
-    return mapBusiness(biz, settings);
+    const { rows: srows } = await query("SELECT * FROM business_settings WHERE business_id = $1", [biz.id]);
+    return mapBusiness(biz, srows[0]);
   },
 
   async findByName(name) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
-    const { data: biz, error } = await supabase.from("businesses").select("*").eq("name", name).maybeSingle();
-    if (error) throw error;
-    return biz || null;
+    if (!getPool()) return null;
+    const { rows } = await query("SELECT * FROM businesses WHERE name = $1", [name]);
+    return rows[0] || null;
   },
 
   async findByPhone(phone) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
-    const { data: biz, error } = await supabase.from("businesses").select("*").eq("email", phone).maybeSingle();
-    if (error) throw error;
-    return biz || null;
+    if (!getPool()) return null;
+    const { rows } = await query("SELECT * FROM businesses WHERE email = $1", [phone]);
+    return rows[0] || null;
   },
 
   async getBusinessById(id) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
-
-    const { data: biz, error } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error) throw error;
+    if (!getPool()) return null;
+    const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [id]);
+    const biz = rows[0] || null;
     if (!biz) return null;
-
-    const { data: settings } = await supabase
-      .from("business_settings")
-      .select("*")
-      .eq("business_id", biz.id)
-      .maybeSingle();
-
-    return mapBusiness(biz, settings);
+    const { rows: srows } = await query("SELECT * FROM business_settings WHERE business_id = $1", [biz.id]);
+    return mapBusiness(biz, srows[0]);
   },
 
   async loginBusiness({ businessName, businessEmail, token }) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
-    // Check if business exists by email
-    const { data: existing } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("email", businessEmail)
-      .maybeSingle();
+    return withTransaction(async (client) => {
+      const { rows } = await client.query("SELECT * FROM businesses WHERE email = $1", [businessEmail]);
+      let bizRecord = rows[0] || null;
 
-    let bizRecord = existing;
+      if (!bizRecord) {
+        const { rows: createdRows } = await client.query(
+          `INSERT INTO businesses (name, email, token, type, currency, record_method)
+           VALUES ($1, $2, $3, 'Grocery / Mini-market', 'FCFA', 'Notebook')
+           RETURNING *`,
+          [businessName, businessEmail, token]
+        );
+        bizRecord = createdRows[0];
+        await client.query(
+          "INSERT INTO business_settings (business_id, language, dark_mode) VALUES ($1, 'en', false)",
+          [bizRecord.id]
+        );
+      } else {
+        const { rows: updatedRows } = await client.query(
+          "UPDATE businesses SET name = $1, token = $2 WHERE id = $3 RETURNING *",
+          [businessName, token, bizRecord.id]
+        );
+        bizRecord = updatedRows[0];
+      }
 
-    if (!bizRecord) {
-      const { data: created, error } = await supabase
-        .from("businesses")
-        .insert({
-          name: businessName,
-          email: businessEmail,
-          token,
-          type: "Grocery / Mini-market",
-          currency: "FCFA",
-          record_method: "Notebook",
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      bizRecord = created;
-
-      await supabase.from("business_settings").insert({
-        business_id: bizRecord.id,
-        language: "en",
-        dark_mode: false,
-      });
-    } else {
-      const { data: updated, error } = await supabase
-        .from("businesses")
-        .update({ name: businessName, token })
-        .eq("id", bizRecord.id)
-        .select()
-        .single();
-      if (error) throw error;
-      bizRecord = updated;
-    }
-
-    const { data: settings } = await supabase
-      .from("business_settings")
-      .select("*")
-      .eq("business_id", bizRecord.id)
-      .maybeSingle();
-
-    return mapBusiness(bizRecord, settings);
+      const { rows: srows } = await client.query(
+        "SELECT * FROM business_settings WHERE business_id = $1",
+        [bizRecord.id]
+      );
+      return mapBusiness(bizRecord, srows[0]);
+    });
   },
 
   async updateBusiness(id, updates) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
-    const bizUpdates = {};
-    if (updates.name !== undefined) bizUpdates.name = updates.name;
-    if (updates.email !== undefined) bizUpdates.email = updates.email;
-    if (updates.type !== undefined) bizUpdates.type = updates.type;
-    if (updates.currency !== undefined) bizUpdates.currency = updates.currency;
-    if (updates.location !== undefined) bizUpdates.location = updates.location;
-    if (updates.recordMethod !== undefined) bizUpdates.record_method = updates.recordMethod;
-    if (updates.token !== undefined) bizUpdates.token = updates.token;
+    const colMap = {
+      name: "name",
+      email: "email",
+      type: "type",
+      currency: "currency",
+      location: "location",
+      recordMethod: "record_method",
+      token: "token",
+    };
+
+    const vals = [];
+    const sets = [];
+    for (const [key, col] of Object.entries(colMap)) {
+      if (updates[key] !== undefined) {
+        vals.push(updates[key]);
+        sets.push(`${col} = $${vals.length}`);
+      }
+    }
 
     let bizRecord = null;
-    if (Object.keys(bizUpdates).length > 0) {
-      const { data, error } = await supabase
-        .from("businesses")
-        .update(bizUpdates)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      bizRecord = data;
+    if (sets.length > 0) {
+      vals.push(id);
+      const { rows } = await query(
+        `UPDATE businesses SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`,
+        vals
+      );
+      bizRecord = rows[0];
     } else {
-      const { data } = await supabase.from("businesses").select("*").eq("id", id).single();
-      bizRecord = data;
+      const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [id]);
+      bizRecord = rows[0];
     }
 
     const settingsUpdates = {};
@@ -288,21 +270,22 @@ export const supabaseService = {
     if (updates.darkMode !== undefined) settingsUpdates.dark_mode = Boolean(updates.darkMode);
 
     let settingsRecord = null;
-    if (Object.keys(settingsUpdates).length > 0) {
-      const { data, error } = await supabase
-        .from("business_settings")
-        .upsert({ business_id: id, ...settingsUpdates }, { onConflict: "business_id" })
-        .select()
-        .single();
-      if (error) throw error;
-      settingsRecord = data;
+    const sKeys = Object.keys(settingsUpdates);
+    if (sKeys.length > 0) {
+      const sVals = [id, ...sKeys.map((k) => settingsUpdates[k])];
+      const ph = sVals.map((_, i) => `$${i + 1}`).join(", ");
+      const setClause = sKeys.map((k, i) => `${k} = $${i + 2}`).join(", ");
+      const { rows } = await query(
+        `INSERT INTO business_settings (business_id, ${sKeys.join(", ")})
+         VALUES (${ph})
+         ON CONFLICT (business_id) DO UPDATE SET ${setClause}
+         RETURNING *`,
+        sVals
+      );
+      settingsRecord = rows[0];
     } else {
-      const { data } = await supabase
-        .from("business_settings")
-        .select("*")
-        .eq("business_id", id)
-        .maybeSingle();
-      settingsRecord = data;
+      const { rows } = await query("SELECT * FROM business_settings WHERE business_id = $1", [id]);
+      settingsRecord = rows[0];
     }
 
     return mapBusiness(bizRecord, settingsRecord);
@@ -312,17 +295,23 @@ export const supabaseService = {
   // Products / Inventory
   // --------------------------------------------------------------------------
   async listProducts({ category, stockStatus: statusFilter, businessId } = {}) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return [];
+    if (!getPool()) return [];
 
-    let query = supabase.from("products").select("*").order("name", { ascending: true });
-    if (businessId) query = query.eq("business_id", businessId);
-    if (category) query = query.eq("category", category);
+    const conditions = [];
+    const vals = [];
+    if (businessId) {
+      vals.push(businessId);
+      conditions.push(`business_id = $${vals.length}`);
+    }
+    if (category) {
+      vals.push(category);
+      conditions.push(`category = $${vals.length}`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const { data, error } = await query;
-    if (error) throw error;
+    const { rows } = await query(`SELECT * FROM products ${where} ORDER BY name ASC`, vals);
 
-    let products = (data || []).map(mapProduct);
+    let products = rows.map(mapProduct);
     if (statusFilter && statusFilter !== "all") {
       products = products.filter((p) => p.stockStatus === statusFilter);
     }
@@ -330,48 +319,31 @@ export const supabaseService = {
   },
 
   async getProduct(id) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
-
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-    if (error) throw error;
-    return mapProduct(data);
+    if (!getPool()) return null;
+    const { rows } = await query("SELECT * FROM products WHERE id = $1", [id]);
+    return mapProduct(rows[0] || null);
   },
 
   async createProduct({ name, category, unitPrice, stockQty = 0, businessId }) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
-    // Get default business ID if not supplied
     let targetBizId = businessId;
     if (!targetBizId) {
       const biz = await this.getBusiness();
       targetBizId = biz?.id;
     }
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        business_id: targetBizId,
-        name,
-        category,
-        unit_price: Number(unitPrice),
-        stock_qty: Number(stockQty),
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return mapProduct(data);
+    const { rows } = await query(
+      `INSERT INTO products (business_id, name, category, unit_price, stock_qty)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [targetBizId, name, category, Number(unitPrice), Number(stockQty)]
+    );
+    return mapProduct(rows[0]);
   },
 
   async updateProduct(id, updates) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
     const payload = {};
     if (updates.name !== undefined) payload.name = updates.name;
@@ -379,15 +351,22 @@ export const supabaseService = {
     if (updates.unitPrice !== undefined) payload.unit_price = Number(updates.unitPrice);
     if (updates.stockQty !== undefined) payload.stock_qty = Number(updates.stockQty);
 
-    const { data, error } = await supabase
-      .from("products")
-      .update(payload)
-      .eq("id", id)
-      .select()
-      .single();
+    const keys = Object.keys(payload);
+    const vals = keys.map((k) => payload[k]);
+    vals.push(id);
+    const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
 
-    if (error) throw error;
-    return mapProduct(data);
+    const { rows } = await query(
+      `UPDATE products SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`,
+      vals
+    );
+    return mapProduct(rows[0]);
+  },
+
+  async deleteProduct(id) {
+    if (!getPool()) return false;
+    const { rowCount } = await query("DELETE FROM products WHERE id = $1", [id]);
+    return rowCount > 0;
   },
 
   async restockProduct(id, addQty) {
@@ -421,38 +400,31 @@ export const supabaseService = {
   // Records
   // --------------------------------------------------------------------------
   async listRecords({ filter = "all", from, to, businessId } = {}) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return [];
+    if (!getPool()) return [];
 
-    let query = supabase.from("records").select("*").order("timestamp", { ascending: false });
-    if (businessId) query = query.eq("business_id", businessId);
-
+    const conditions = [];
+    const vals = [];
+    if (businessId) {
+      vals.push(businessId);
+      conditions.push(`business_id = $${vals.length}`);
+    }
     if (filter === "needs_review") {
-      query = query.eq("status", "needs_review");
+      conditions.push(`status = 'needs_review'`);
     } else if (["today", "this_week", "this_month", "custom"].includes(filter)) {
       const { from: f, to: t } = resolveRange(filter, from, to);
-      query = query
-        .gte("timestamp", new Date(f).toISOString())
-        .lte("timestamp", new Date(t).toISOString());
+      vals.push(new Date(f), new Date(t));
+      conditions.push(`timestamp BETWEEN $${vals.length - 1} AND $${vals.length}`);
     }
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const { data, error } = await query;
-    if (error) throw error;
-
-    return (data || []).map(mapRecord);
+    const { rows } = await query(`SELECT * FROM records ${where} ORDER BY timestamp DESC`, vals);
+    return rows.map(mapRecord);
   },
 
   async getRecord(id) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
-
-    const { data, error } = await supabase
-      .from("records")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-    if (error) throw error;
-    return mapRecord(data);
+    if (!getPool()) return null;
+    const { rows } = await query("SELECT * FROM records WHERE id = $1", [id]);
+    return mapRecord(rows[0] || null);
   },
 
   async createRecord({
@@ -466,8 +438,7 @@ export const supabaseService = {
     scanId = null,
     businessId,
   }) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
     let targetBizId = businessId;
     if (!targetBizId) {
@@ -479,30 +450,28 @@ export const supabaseService = {
     const price = Number(unitPrice);
     const amount = qty * price;
 
-    const { data, error } = await supabase
-      .from("records")
-      .insert({
-        business_id: targetBizId,
-        product_id: productId || null,
-        product_name: productName,
-        quantity: qty,
-        unit_price: price,
+    const { rows } = await query(
+      `INSERT INTO records (business_id, product_id, product_name, quantity, unit_price, amount, timestamp, source, status, scan_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        targetBizId,
+        productId || null,
+        productName,
+        qty,
+        price,
         amount,
-        timestamp: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+        timestamp ? new Date(timestamp) : new Date(),
         source,
         status,
-        scan_id: scanId,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return mapRecord(data);
+        scanId,
+      ]
+    );
+    return mapRecord(rows[0]);
   },
 
   async updateRecord(id, updates) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
     const payload = {};
     if (updates.productName !== undefined) payload.product_name = updates.productName;
@@ -517,23 +486,23 @@ export const supabaseService = {
       payload.amount = qty * price;
     }
 
-    const { data, error } = await supabase
-      .from("records")
-      .update(payload)
-      .eq("id", id)
-      .select()
-      .single();
+    const keys = Object.keys(payload);
+    const vals = keys.map((k) => payload[k]);
+    vals.push(id);
+    const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
 
-    if (error) throw error;
-    return mapRecord(data);
+    const { rows } = await query(
+      `UPDATE records SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`,
+      vals
+    );
+    return mapRecord(rows[0]);
   },
 
   // --------------------------------------------------------------------------
   // Scans & Extracted Items
   // --------------------------------------------------------------------------
   async createScan({ fileName, imageUrl = null, extracted = [], businessId }) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
     let targetBizId = businessId;
     if (!targetBizId) {
@@ -541,57 +510,62 @@ export const supabaseService = {
       targetBizId = biz?.id;
     }
 
-    const { data: scan, error: scanErr } = await supabase
-      .from("scans")
-      .insert({
-        business_id: targetBizId,
-        file_name: fileName,
-        image_url: imageUrl,
-        status: "needs_review",
-      })
-      .select()
-      .single();
+    return withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO scans (business_id, file_name, image_url, status)
+         VALUES ($1, $2, $3, 'needs_review')
+         RETURNING *`,
+        [targetBizId, fileName, imageUrl]
+      );
+      const scan = rows[0];
 
-    if (scanErr) throw scanErr;
+      let insertedItems = [];
+      if (extracted.length > 0) {
+        const vals = [];
+        const tuples = extracted.map((row) => {
+          vals.push(
+            scan.id,
+            row.productName,
+            row.quantity || 1,
+            row.unitPrice || 0,
+            row.date ? new Date(row.date) : new Date(),
+            row.confidence || 0.9
+          );
+          const b = vals.length - 6;
+          return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6})`;
+        });
+        const { rows: items } = await client.query(
+          `INSERT INTO scan_extracted_items (scan_id, product_name, quantity, unit_price, date, confidence)
+           VALUES ${tuples.join(", ")}
+           RETURNING *`,
+          vals
+        );
+        insertedItems = items;
+      }
 
-    const itemsToInsert = extracted.map((row) => ({
-      scan_id: scan.id,
-      product_name: row.productName,
-      quantity: row.quantity || 1,
-      unit_price: row.unitPrice || 0,
-      date: row.date ? new Date(row.date).toISOString() : new Date().toISOString(),
-      confidence: row.confidence || 0.9,
-    }));
-
-    let insertedItems = [];
-    if (itemsToInsert.length > 0) {
-      const { data: items, error: itemsErr } = await supabase
-        .from("scan_extracted_items")
-        .insert(itemsToInsert)
-        .select();
-      if (itemsErr) throw itemsErr;
-      insertedItems = items;
-    }
-
-    return mapScan(scan, insertedItems);
+      return mapScan(scan, insertedItems);
+    });
   },
 
   async listScans(businessId) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return [];
+    if (!getPool()) return [];
 
-    let query = supabase.from("scans").select("*").order("created_at", { ascending: false });
-    if (businessId) query = query.eq("business_id", businessId);
-
-    const { data: scans, error } = await query;
-    if (error) throw error;
+    let scans;
+    if (businessId) {
+      ({ rows: scans } = await query(
+        "SELECT * FROM scans WHERE business_id = $1 ORDER BY created_at DESC",
+        [businessId]
+      ));
+    } else {
+      ({ rows: scans } = await query("SELECT * FROM scans ORDER BY created_at DESC"));
+    }
     if (!scans || scans.length === 0) return [];
 
     const scanIds = scans.map((s) => s.id);
-    const { data: items } = await supabase
-      .from("scan_extracted_items")
-      .select("*")
-      .in("scan_id", scanIds);
+    const { rows: items } = await query(
+      "SELECT * FROM scan_extracted_items WHERE scan_id = ANY($1)",
+      [scanIds]
+    );
 
     const itemsByScanId = new Map();
     for (const item of items || []) {
@@ -599,52 +573,54 @@ export const supabaseService = {
       itemsByScanId.get(item.scan_id).push(item);
     }
 
-    const mappedScans = await Promise.all(scans.map(async (s) => await mapScan(s, itemsByScanId.get(s.id) || [])));
-    return mappedScans;
+    return Promise.all(scans.map(async (s) => await mapScan(s, itemsByScanId.get(s.id) || [])));
   },
 
   async getScan(id) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
-    const { data: scan, error } = await supabase
-      .from("scans")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error) throw error;
+    const { rows: scans } = await query("SELECT * FROM scans WHERE id = $1", [id]);
+    const scan = scans[0] || null;
     if (!scan) return null;
 
-    const { data: items } = await supabase
-      .from("scan_extracted_items")
-      .select("*")
-      .eq("scan_id", id);
+    const { rows: items } = await query(
+      "SELECT * FROM scan_extracted_items WHERE scan_id = $1",
+      [id]
+    );
 
     return mapScan(scan, items || []);
   },
 
+  async deleteScan(id) {
+    if (!getPool()) return false;
+    const { rowCount } = await query("DELETE FROM scans WHERE id = $1", [id]);
+    return rowCount > 0;
+  },
+
   async updateExtractedRow(scanId, rowId, updates) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return null;
+    if (!getPool()) return null;
 
     const payload = {};
     if (updates.productName !== undefined) payload.product_name = updates.productName;
     if (updates.quantity !== undefined) payload.quantity = Number(updates.quantity);
     if (updates.unitPrice !== undefined) payload.unit_price = Number(updates.unitPrice);
-    if (updates.date !== undefined) payload.date = new Date(updates.date).toISOString();
+    if (updates.date !== undefined) payload.date = new Date(updates.date);
 
     if (payload.product_name && payload.product_name !== "Unknown item" && payload.unit_price > 0) {
       payload.confidence = 0.95;
     }
 
-    const { error } = await supabase
-      .from("scan_extracted_items")
-      .update(payload)
-      .eq("id", rowId)
-      .eq("scan_id", scanId);
+    const keys = Object.keys(payload);
+    if (keys.length > 0) {
+      const vals = keys.map((k) => payload[k]);
+      vals.push(rowId, scanId);
+      const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(", ");
+      await query(
+        `UPDATE scan_extracted_items SET ${setClause} WHERE id = $${keys.length + 1} AND scan_id = $${keys.length + 2}`,
+        vals
+      );
+    }
 
-    if (error) throw error;
     return this.getScan(scanId);
   },
 
@@ -657,7 +633,6 @@ export const supabaseService = {
       throw err;
     }
 
-    const supabase = getSupabaseClient();
     const biz = await this.getBusiness();
     const defaultBizId = biz?.id;
 
@@ -669,16 +644,18 @@ export const supabaseService = {
 
     // Helper to find or create product, and restock matched products
     async function findOrCreateProduct(row) {
-      const match = currentProducts.find(p => String(p.name).toLowerCase() === String(row.productName || row.product_name || "").toLowerCase());
+      const match = currentProducts.find(
+        (p) => String(p.name).toLowerCase() === String(row.productName || row.product_name || "").toLowerCase()
+      );
       if (match) {
         // Sales reduce stock
-        const current = await supabaseService.getProduct(match.id);
+        const current = await dbService.getProduct(match.id);
         const newStock = Math.max(0, (current?.stockQty || 0) - Number(row.quantity || 1));
-        await supabaseService.updateProduct(match.id, { stockQty: newStock });
+        await dbService.updateProduct(match.id, { stockQty: newStock });
         return match.id;
       }
       // Create new product for unknown/unmatched items
-      const newProd = await supabaseService.createProduct({
+      const newProd = await dbService.createProduct({
         name: row.productName || row.product_name || "Unknown item",
         category: "Other",
         unitPrice: Number(row.unitPrice || row.unit_price || 0),
@@ -691,30 +668,36 @@ export const supabaseService = {
     const recordsToInsert = [];
     for (const row of scan.extracted || []) {
       const productId = await findOrCreateProduct(row);
-      recordsToInsert.push({
-        business_id: defaultBizId,
-        product_id: productId,
-        product_name: row.productName || row.product_name,
-        quantity: Number(row.quantity || 1),
-        unit_price: Number(row.unitPrice || row.unit_price || 0),
-        amount: Number(row.quantity || 1) * Number(row.unitPrice || row.unit_price || 0),
-        timestamp: (scan.createdAt || new Date()).toISOString(),
-        source: "scanned",
-        status: "saved",
-        scan_id: scan.id,
-      });
+      recordsToInsert.push([
+        defaultBizId,
+        productId,
+        row.productName || row.product_name,
+        Number(row.quantity || 1),
+        Number(row.unitPrice || row.unit_price || 0),
+        Number(row.quantity || 1) * Number(row.unitPrice || row.unit_price || 0),
+        scan.createdAt || new Date(),
+        "scanned",
+        "saved",
+        scan.id,
+      ]);
     }
 
-    if (recordsToInsert.length > 0) {
-      const { error: insErr } = await supabase.from("records").insert(recordsToInsert);
-      if (insErr) throw insErr;
-    }
-
-    const { error: updErr } = await supabase
-      .from("scans")
-      .update({ status: "saved" })
-      .eq("id", scanId);
-    if (updErr) throw updErr;
+    await withTransaction(async (client) => {
+      if (recordsToInsert.length > 0) {
+        const vals = [];
+        const tuples = recordsToInsert.map((r) => {
+          vals.push(...r);
+          const b = vals.length - 10;
+          return `(${Array.from({ length: 10 }, (_, i) => `$${b + i + 1}`).join(", ")})`;
+        });
+        await client.query(
+          `INSERT INTO records (business_id, product_id, product_name, quantity, unit_price, amount, timestamp, source, status, scan_id)
+           VALUES ${tuples.join(", ")}`,
+          vals
+        );
+      }
+      await client.query("UPDATE scans SET status = 'saved' WHERE id = $1", [scanId]);
+    });
 
     const updatedScan = await this.getScan(scanId);
     return { scan: updatedScan, recordsCreated: recordsToInsert.length };
@@ -877,19 +860,17 @@ export const supabaseService = {
   },
 
   async clearAllData(businessId) {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    const biz = await this.getBusiness();
+    if (!getPool()) return;
+    const biz = businessId ? null : await this.getBusiness();
     const targetBizId = businessId || biz?.id;
     if (!targetBizId) return;
-    // Get scan IDs for this business to clean child table
-    const { data: scansList } = await supabase.from("scans").select("id").eq("business_id", targetBizId);
-    const scanIds = (scansList || []).map(s => s.id);
-    if (scanIds.length > 0) {
-      await supabase.from("scan_extracted_items").delete().in("scan_id", scanIds);
-    }
-    await supabase.from("records").delete().eq("business_id", targetBizId);
-    await supabase.from("scans").delete().eq("business_id", targetBizId);
-    await supabase.from("products").delete().eq("business_id", targetBizId);
+
+    await query(
+      "DELETE FROM scan_extracted_items WHERE scan_id IN (SELECT id FROM scans WHERE business_id = $1)",
+      [targetBizId]
+    );
+    await query("DELETE FROM records WHERE business_id = $1", [targetBizId]);
+    await query("DELETE FROM scans WHERE business_id = $1", [targetBizId]);
+    await query("DELETE FROM products WHERE business_id = $1", [targetBizId]);
   },
 };
