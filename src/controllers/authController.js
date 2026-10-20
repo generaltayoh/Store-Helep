@@ -27,11 +27,14 @@ export async function login(req, res, next) {
       if (!biz) {
         return res.status(401).json({ error: "Business not found. Check your name and phone number." });
       }
+      // Keep the existing session token so other logged-in devices stay valid;
+      // only issue a new one if the business has no token yet.
+      const activeToken = biz.token || token;
       const updated = await dbService.updateBusiness(biz.id, {
         email: businessPhone,
-        token,
+        token: activeToken,
       });
-      return res.json({ token, business: updated });
+      return res.json({ token: activeToken, business: updated });
     }
 
     let biz = db.business;

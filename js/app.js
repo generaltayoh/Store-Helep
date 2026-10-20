@@ -30,6 +30,7 @@ const I18N = {
     "common.verified": "verified", "common.needsReviewLower": "needs review",
     "common.unknownItem": "Unknown item",
     "common.loginFailed": "Login failed", "common.saveFailed": "Save failed",
+    "common.sessionExpired": "Session expired. Please log in again.",
 
     "dash.todaySales": "Today's sales", "dash.quickActions": "Quick actions",
     "dash.attentionHeader": "Needs your attention", "dash.scanRecords": "Scan records",
@@ -167,6 +168,7 @@ const I18N = {
     "common.verified": "vérifié", "common.needsReviewLower": "à vérifier",
     "common.unknownItem": "Article inconnu",
     "common.loginFailed": "Échec de la connexion", "common.saveFailed": "Échec de l'enregistrement",
+    "common.sessionExpired": "Session expirée. Veuillez vous reconnecter.",
 
     "dash.todaySales": "Ventes du jour", "dash.quickActions": "Actions rapides",
     "dash.attentionHeader": "Nécessite votre attention", "dash.scanRecords": "Scanner les registres",
@@ -364,7 +366,28 @@ function saveAccount(account) {
   localStorage.setItem("sh_accounts", JSON.stringify(accounts));
 }
 
-async function api(path, { method = "GET", body, auth = true } = {}) {
+async function silentRelogin() {
+  const accounts = getSavedAccounts();
+  const acct = accounts[accounts.length - 1];
+  if (!acct || !acct.name || !acct.phone) return false;
+  try {
+    const data = await api("/auth/login", {
+      method: "POST",
+      body: { businessName: acct.name, businessPhone: acct.phone },
+      auth: false,
+    });
+    if (data && data.token) {
+      state.token = data.token;
+      if (data.business) state.business = data.business;
+      return true;
+    }
+  } catch (e) {
+    /* fall through */
+  }
+  return false;
+}
+
+async function api(path, { method = "GET", body, auth = true, _retried = false } = {}) {
   const headers = {};
   if (body && !(body instanceof FormData)) headers["Content-Type"] = "application/json";
   if (auth && state.token) headers["Authorization"] = "Bearer " + state.token;
@@ -374,6 +397,21 @@ async function api(path, { method = "GET", body, auth = true } = {}) {
     body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
   });
   const ct = res.headers.get("content-type") || "";
+
+  // Stale/invalid session token: try one silent re-login with a saved account,
+  // then retry the original request. If recovery fails, send the user to login.
+  if (res.status === 401 && auth && !_retried) {
+    if (await silentRelogin()) {
+      return api(path, { method, body, auth, _retried: true });
+    }
+    state.token = null;
+    toast(t("common.sessionExpired"), "error");
+    setTimeout(() => {
+      window.location.href = "login.html";
+    }, 1500);
+    throw new Error(t("common.sessionExpired"));
+  }
+
   if (!res.ok) {
     let msg = res.statusText;
     if (ct.includes("application/json")) {
@@ -1001,6 +1039,7 @@ function initSetup() {
         method: "POST",
         body: { name, phone, type, currency, location, recordMethod: state.recordMethod },
       });
+      if (data.business && data.business.token) state.token = data.business.token;
       state.business = data.business;
       saveAccount({ name, phone, type: type || data.business?.type || "Grocery / Mini-market" });
       // Request camera permission during registration if supported
