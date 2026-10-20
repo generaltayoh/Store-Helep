@@ -112,6 +112,7 @@ async function mapScan(scan, items = []) {
     fileName: scan.file_name,
     imageUrl: scan.image_url,
     createdAt: new Date(scan.created_at),
+    confirmedAt: scan.confirmed_at ? new Date(scan.confirmed_at) : null,
     status: scan.status,
     recordCount: extracted.length,
     extracted,
@@ -666,6 +667,7 @@ export const dbService = {
     }
 
     const recordsToInsert = [];
+    const confirmedAt = new Date();
     for (const row of scan.extracted || []) {
       const productId = await findOrCreateProduct(row);
       recordsToInsert.push([
@@ -675,7 +677,7 @@ export const dbService = {
         Number(row.quantity || 1),
         Number(row.unitPrice || row.unit_price || 0),
         Number(row.quantity || 1) * Number(row.unitPrice || row.unit_price || 0),
-        scan.createdAt || new Date(),
+        scan.createdAt || confirmedAt,
         "scanned",
         "saved",
         scan.id,
@@ -696,7 +698,7 @@ export const dbService = {
           vals
         );
       }
-      await client.query("UPDATE scans SET status = 'saved' WHERE id = $1", [scanId]);
+      await client.query("UPDATE scans SET status = 'saved', confirmed_at = $2 WHERE id = $1", [scanId, confirmedAt]);
     });
 
     const updatedScan = await this.getScan(scanId);

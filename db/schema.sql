@@ -77,6 +77,7 @@ CREATE TABLE scans (
     file_name TEXT NOT NULL,
     image_url TEXT,
     status TEXT NOT NULL DEFAULT 'needs_review' CHECK (status IN ('needs_review', 'saved')),
+    confirmed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );

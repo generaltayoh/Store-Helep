@@ -30,6 +30,7 @@ function serializeScan(scan) {
     fileName: scan.fileName,
     imageUrl: scan.imageUrl,
     createdAt: scan.createdAt,
+    confirmedAt: scan.confirmedAt || null,
     status: scan.status,
     recordCount: scan.extracted ? scan.extracted.length : 0,
     extracted: enriched,
@@ -188,6 +189,7 @@ export async function confirmScan(req, res, next) {
     }
 
     const created = [];
+    const confirmedAt = new Date();
     for (const row of scan.extracted) {
       let productId = null;
       
@@ -232,6 +234,7 @@ export async function confirmScan(req, res, next) {
       created.push(record);
     }
     scan.status = "saved";
+    scan.confirmedAt = confirmedAt;
     res.json({ scan: serializeScan(scan), recordsCreated: created.length });
   } catch (err) {
     next(err);

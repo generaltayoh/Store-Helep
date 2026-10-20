@@ -1436,7 +1436,7 @@ async function loadRecords(filter = "today", from = "", to = "") {
       const batchNum = batchNumMap.get(key) || 1;
       const label = b.items[0].scanId ? "Batch" : (b.items[0].source === "scanned" ? "Scanned batch" : "Manual batch");
       const timeOnly = b.items[0].timestamp ? new Date(b.items[0].timestamp).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) : new Date().toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
-      return `<a href="batch.html?scan=${b.items[0].scanId || ''}&batch=${batchNum}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:var(--card,#fff);box-shadow:var(--shadow-card);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='var(--shadow-pop)'" onmouseout="this.style.boxShadow='var(--shadow-card)'">
+      return `<a href="batch.html?scan=${b.items[0].scanId || ''}&batch=${batchNum}&made=${encodeURIComponent(b.items[0].timestamp || '')}" class="card record-batch" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:8px;border-radius:14px;background:var(--card,#fff);box-shadow:var(--shadow-card);transition:box-shadow 0.15s ease;" onmouseover="this.style.boxShadow='var(--shadow-pop)'" onmouseout="this.style.boxShadow='var(--shadow-card)'">
         <span class="avatar green" style="flex-shrink:0;width:44px;height:44px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1f3d2b,#2a5a3f);color:#fff;border-radius:50%;letter-spacing:0.5px;">B${batchNum}</span>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
@@ -1538,6 +1538,12 @@ function currentProductFilter() {
 }
 
 /* ---------------- Batch Detail ---------------- */
+function fmtBatchTime(v) {
+  const d = v ? new Date(v) : null;
+  if (!d || isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
 async function initBatch() {
   const params = new URLSearchParams(window.location.search);
   const scanId = params.get("scan");
@@ -1549,7 +1555,17 @@ async function initBatch() {
     // Determine batch number from URL param (passed from card) so it matches the card exactly
     let batchNum = params.get("batch") ? parseInt(params.get("batch"), 10) : 1;
     if (title) title.textContent = "Batch " + batchNum;
-    if (sub) sub.textContent = new Date(scan.createdAt || Date.now()).toLocaleTimeString(locale(), { hour: "numeric", minute: "2-digit", hour12: true }) + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
+    // Prefer the time the batch was made: confirmedAt (same as the record timestamp),
+    // then the `made` param passed from the card, then item dates, then the scan upload time.
+    const madeParam = params.get("made");
+    const firstItemDate = (scan.extracted && scan.extracted[0] && (scan.extracted[0].timestamp || scan.extracted[0].date)) || null;
+    const batchTime =
+      fmtBatchTime(scan.confirmedAt) ||
+      fmtBatchTime(firstItemDate) ||
+      fmtBatchTime(madeParam) ||
+      fmtBatchTime(scan.createdAt) ||
+      fmtBatchTime(Date.now());
+    if (sub) sub.textContent = batchTime + " · " + (scan.extracted ? scan.extracted.length : 0) + " records";
     const content = document.getElementById("batchContent");
     if (!content || !scan.extracted || !scan.extracted.length) {
       if (content) content.innerHTML = `<p style="color:var(--ink-soft,#777);font-size:14px;">No records in this batch.</p>`;
