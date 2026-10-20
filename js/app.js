@@ -19,6 +19,7 @@ const I18N = {
     "nav.products": "Products", "nav.analytics": "Analytics",
     "menu.language": "Language", "menu.business": "Business Info",
     "menu.darkmode": "Dark mode", "menu.terms": "Terms & policies", "menu.logout": "Log out",
+    "menu.install": "Install app",
 
     "common.cancel": "Cancel", "common.save": "Save", "common.add": "Add",
     "common.apply": "Apply", "common.all": "All",
@@ -157,6 +158,7 @@ const I18N = {
     "nav.products": "Produits", "nav.analytics": "Analytique",
     "menu.language": "Langue", "menu.business": "Infos entreprise",
     "menu.darkmode": "Mode sombre", "menu.terms": "Conditions et politiques", "menu.logout": "Déconnexion",
+    "menu.install": "Installer l'application",
 
     "common.cancel": "Annuler", "common.save": "Enregistrer", "common.add": "Ajouter",
     "common.apply": "Appliquer", "common.all": "Tout",
@@ -581,6 +583,51 @@ document.addEventListener("DOMContentLoaded", () => {
     businessInfoBtn.addEventListener("click", () => {
       window.location.href = "business-info.html";
     });
+  }
+
+  /* ---- PWA install (only shown when the browser offers it) ---- */
+  const installAppBtn = document.getElementById("installAppBtn");
+  if (installAppBtn) {
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true;
+    let deferredPrompt = null;
+
+    const showInstall = () => {
+      if (!isStandalone) installAppBtn.style.display = "";
+    };
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      showInstall();
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredPrompt = null;
+      installAppBtn.style.display = "none";
+      toast(t("menu.install") + " ✓", "success");
+    });
+
+    installAppBtn.addEventListener("click", async () => {
+      dropdownMenu.classList.add("hidden");
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installAppBtn.style.display = "none";
+        return;
+      }
+      // Fallback instructions for browsers without the install prompt (e.g. iOS Safari).
+      toast(
+        navigator.userAgent.match(/iphone|ipad|ipod/i)
+          ? "Tap Share, then 'Add to Home Screen'."
+          : "Use your browser menu and choose 'Install app' / 'Add to Home screen'.",
+        "info"
+      );
+    });
+
+    // If the prompt never fires (unsupported), keep the button hidden.
   }
 
   /* ---- Filter chips (visual selection) ---- */
