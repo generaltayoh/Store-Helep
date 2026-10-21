@@ -1,7 +1,12 @@
 import { config } from "../config/index.js";
-import { db, nextId } from "../data/store.js";
-import { isDbConfigured } from "../config/db.js";
 import { dbService } from "./dbService.js";
+
+// Local id counter for extracted rows (the database assigns its own ids).
+let extCounter = 0;
+function nextExtId() {
+  extCounter += 1;
+  return `ext_${String(extCounter).padStart(5, "0")}`;
+}
 
 /*
  * OCR / AI extraction service.
@@ -202,19 +207,17 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
     throw new Error("No readable records found in the image.");
   }
 
-  // Build product catalog from system (mock DB or PostgreSQL)
-  let productCatalog = db.products || [];
-  if (isDbConfigured() && dbService) {
-    try {
-      const biz = await dbService.getBusiness();
-      const bizId = biz?.id;
-      if (bizId) {
-        const dbProds = await dbService.listProducts({ businessId: bizId });
-        if (dbProds && dbProds.length > 0) productCatalog = dbProds;
-      }
-    } catch (e) {
-      // Ignore; fall back to db.products
+  // Build the product catalog from the database so we can flag unknown items.
+  let productCatalog = [];
+  try {
+    const biz = await dbService.getBusiness();
+    const bizId = biz?.id;
+    if (bizId) {
+      const dbProds = await dbService.listProducts({ businessId: bizId });
+      if (dbProds && dbProds.length > 0) productCatalog = dbProds;
     }
+  } catch (e) {
+    // Ignore; an empty catalog simply means every row is flagged as unknown.
   }
 
   // Instead of filtering out unrecognised items, we keep them and flag as isUnknown
@@ -222,7 +225,7 @@ export async function extractRecords(imageBuffer, fileName = "upload.jpg", recor
     const name = String(r.productName || "Unknown item");
     const isMatched = productCatalog.length > 0 && fuzzyMatch(name, productCatalog);
     return {
-      id: nextId("ext"),
+      id: nextExtId(),
       productName: name,
       quantity: Number(r.quantity) > 0 ? Number(r.quantity) : 1,
       unitPrice: Number(r.unitPrice) || 0,

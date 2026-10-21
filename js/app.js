@@ -32,6 +32,7 @@ const I18N = {
     "common.unknownItem": "Unknown item",
     "common.loginFailed": "Login failed", "common.saveFailed": "Save failed",
     "common.sessionExpired": "Session expired. Please log in again.",
+    "common.error": "Something went wrong. Please try again.",
 
     "dash.todaySales": "Today's sales", "dash.quickActions": "Quick actions",
     "dash.attentionHeader": "Needs your attention", "dash.scanRecords": "Scan records",
@@ -45,7 +46,7 @@ const I18N = {
     "dash.attentionLow": "{n} products are low in stock",
     "dash.attentionOut": "{n} products are out of stock",
 
-    "prod.title": "Products", "prod.statTotal": "Total products", "prod.statValue": "Stock value",
+    "prod.title": "Products", "prod.statTotal": "Total products", "prod.statValue": "Stock value (cost)",
     "prod.statLow": "Low stock", "prod.statOut": "Out of stock",
     "prod.noProducts": "No products found.",
     "prod.search": "Search products", "prod.noMatch": "No products match your search.",
@@ -53,7 +54,9 @@ const I18N = {
     "prod.outOfStock": "Out of stock", "prod.addTitle": "Add product",
     "prod.sku": "SKU", "prod.skuLabel": "SKU (e.g. CC-99)",
     "prod.productName": "Product name", "prod.category": "Category",
-    "prod.category": "Category", "prod.unitPrice": "Unit price (FCFA)",
+    "prod.category": "Category",
+    "prod.costPrice": "Cost price (FCFA)",
+    "prod.costShort": "Cost", "prod.profitShort": "Profit", "prod.soldAtShort": "Sold at",
     "prod.stockQty": "Stock quantity", "prod.added": "Product added",
     "prod.restock": "Restock", "prod.edit": "Edit",
     "prod.restockTitle": "Restock", "prod.editTitle": "Edit product",
@@ -71,7 +74,8 @@ const I18N = {
     "common.custom": "Custom",
     "rec.noRecords": "No records found.", "rec.addTitle": "Add manual record",
     "rec.productName": "Product name", "rec.quantity": "Quantity",
-    "rec.unitPrice": "Unit price (FCFA)", "rec.added": "Record added",
+    "rec.unitPrice": "Selling price (FCFA)", "rec.added": "Record added",
+    "rec.costPrice": "Cost price (FCFA) — leave 0 to use the product cost",
     "rec.manual": "Manual", "rec.scanned": "Scanned",
 
     "ana.totalSales": "Total sales", "ana.numberOfSales": "Number of sales",
@@ -171,6 +175,7 @@ const I18N = {
     "common.unknownItem": "Article inconnu",
     "common.loginFailed": "Échec de la connexion", "common.saveFailed": "Échec de l'enregistrement",
     "common.sessionExpired": "Session expirée. Veuillez vous reconnecter.",
+    "common.error": "Une erreur est survenue. Veuillez réessayer.",
 
     "dash.todaySales": "Ventes du jour", "dash.quickActions": "Actions rapides",
     "dash.attentionHeader": "Nécessite votre attention", "dash.scanRecords": "Scanner les registres",
@@ -184,14 +189,16 @@ const I18N = {
     "dash.attentionLow": "{n} produits sont en stock faible",
     "dash.attentionOut": "{n} produits sont en rupture de stock",
 
-    "prod.title": "Produits", "prod.statTotal": "Total produits", "prod.statValue": "Valeur stock",
+    "prod.title": "Produits", "prod.statTotal": "Total produits", "prod.statValue": "Valeur stock (coût)",
     "prod.statLow": "Stock faible", "prod.statOut": "Rupture de stock",
     "prod.noProducts": "Aucun produit trouvé.",
     "prod.search": "Rechercher des produits", "prod.noMatch": "Aucun produit ne correspond à votre recherche.",
     "prod.sku": "RÉF", "prod.inStock": "En stock", "prod.lowStock": "Stock faible",
     "prod.outOfStock": "Rupture de stock", "prod.addTitle": "Ajouter un produit",
     "prod.productName": "Nom du produit", "prod.skuLabel": "RÉF (ex. CC-99)",
-    "prod.category": "Catégorie", "prod.unitPrice": "Prix unitaire (FCFA)",
+    "prod.category": "Catégorie",
+    "prod.costPrice": "Prix de revient (FCFA)",
+    "prod.costShort": "Coût", "prod.profitShort": "Profit", "prod.soldAtShort": "Vendu à",
     "prod.stockQty": "Quantité en stock", "prod.added": "Produit ajouté",
     "prod.restock": "Réapprovisionner", "prod.edit": "Modifier",
     "prod.restockTitle": "Réapprovisionner", "prod.editTitle": "Modifier le produit",
@@ -209,7 +216,8 @@ const I18N = {
     "common.custom": "Personnalisé",
     "rec.noRecords": "Aucun registre trouvé.", "rec.addTitle": "Ajouter un registre manuel",
     "rec.productName": "Nom du produit", "rec.quantity": "Quantité",
-    "rec.unitPrice": "Prix unitaire (FCFA)", "rec.added": "Registre ajouté",
+    "rec.unitPrice": "Prix de vente (FCFA)", "rec.added": "Registre ajouté",
+    "rec.costPrice": "Prix de revient (FCFA) — laisser 0 pour utiliser celui du produit",
     "rec.manual": "Manuel", "rec.scanned": "Scanné",
 
     "ana.totalSales": "Ventes totales", "ana.numberOfSales": "Nombre de ventes",
@@ -424,6 +432,33 @@ async function api(path, { method = "GET", body, auth = true, _retried = false }
     throw new Error(msg);
   }
   return ct.includes("application/json") ? res.json() : res;
+}
+
+// Download an Excel export as a file (the API sends the file name in the
+// Content-Disposition header).
+async function downloadExcel(path) {
+  const headers = {};
+  if (state.token) headers["Authorization"] = "Bearer " + state.token;
+  const res = await fetch(API_BASE + path, { headers });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      msg = (await res.json()).error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  const disposition = res.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  const fileName = match ? match[1] : "store-helep-export.xlsx";
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /* ---------------- formatting helpers ---------------- */
@@ -1243,8 +1278,13 @@ async function initDashboard() {
     // Quick action: View as Excel
     const excelBtn = document.querySelector(".quick-btn.excel");
     if (excelBtn) {
-      excelBtn.addEventListener("click", () => {
-        window.location.href = "/api/export/records/excel";
+      excelBtn.addEventListener("click", async () => {
+        try {
+          await downloadExcel("/api/export/records/excel");
+        } catch (err) {
+          console.error("Excel export failed", err);
+          toast(t("common.error") || "Export failed", "error");
+        }
       });
     }
   } catch (err) {
@@ -1256,9 +1296,15 @@ async function initDashboard() {
 let productSearch = "";
 
 function productCardHtml(p) {
+  const cost = Number(p.costPrice || 0);
+  const soldAt = Number(p.unitPrice || 0);
   return `<div class="card product-card" data-id="${p.id}">
     <span class="avatar ${stockClass(p.stockStatus)}">${initials(p.name)}</span>
-    <span class="mid"><b>${escapeHtml(p.name)}</b><span>${fcfan(p.unitPrice)}</span></span>
+    <span class="mid"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(t("prod.costShort"))}: ${fcfan(cost)}</span>${
+      soldAt > 0
+        ? `<span style="display:block;">${escapeHtml(t("prod.soldAtShort"))}: ${fcfan(soldAt)} · ${escapeHtml(t("prod.profitShort"))}: ${fcfan(soldAt - cost)}</span>`
+        : ""
+    }</span>
     <span class="right"><b>${fmt(p.stockQty)}</b>
       <span class="badge ${stockClass(p.stockStatus)}">${labelFor(p.stockStatus)}</span>
       <span class="prod-actions">
@@ -1376,7 +1422,7 @@ async function initProducts() {
               { value: "Other", label: t("prod.cat.other") },
             ],
           },
-          { name: "unitPrice", label: t("prod.unitPrice"), type: "number", required: true },
+          { name: "costPrice", label: t("prod.costPrice"), type: "number", value: 0 },
           { name: "stockQty", label: t("prod.stockQty"), type: "number", value: 0 },
         ],
         onSubmit: async (v) => {
@@ -1386,7 +1432,7 @@ async function initProducts() {
               body: {
                 name: v.name,
                 category: v.category,
-                unitPrice: v.unitPrice,
+                costPrice: v.costPrice,
                 stockQty: v.stockQty,
               },
             });
@@ -1526,6 +1572,7 @@ async function initRecords() {
           { name: "productName", label: t("rec.productName"), required: true },
           { name: "quantity", label: t("rec.quantity"), type: "number", value: 1, required: true },
           { name: "unitPrice", label: t("rec.unitPrice"), type: "number", required: true },
+          { name: "costPrice", label: t("rec.costPrice"), type: "number", value: 0 },
         ],
         onSubmit: async (v) => {
           try {
@@ -1535,6 +1582,8 @@ async function initRecords() {
                 productName: v.productName,
                 quantity: v.quantity,
                 unitPrice: v.unitPrice,
+                // Left at 0 the server picks the cost price from the product catalog.
+                ...(Number(v.costPrice) > 0 ? { costPrice: Number(v.costPrice) } : {}),
               },
             });
             toast(t("rec.added"));
@@ -2160,7 +2209,8 @@ function openRestockModal(product) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   const currentQty = product.stockQty || 0;
-  const unit = product.unitPrice || 0;
+  // Stock is valued at cost — the catalog only knows what the store paid.
+  const unit = product.costPrice || 0;
   overlay.innerHTML = `<div class="modal">
     <h3 class="modal-title">${escapeHtml(product.name)}</h3>
     <div class="modal-body">
@@ -2234,14 +2284,19 @@ function openEditProductModal(product) {
           { value: "Other", label: t("prod.cat.other") },
         ],
       },
-      { name: "unitPrice", label: t("prod.unitPrice"), type: "number", required: true, value: product.unitPrice },
+      { name: "costPrice", label: t("prod.costPrice"), type: "number", value: product.costPrice || 0 },
       { name: "stockQty", label: t("prod.stockQty"), type: "number", value: product.stockQty },
     ],
     onSubmit: async (v) => {
       try {
         await api(`/products/${product.id}`, {
           method: "PATCH",
-          body: { name: v.name, category: v.category, unitPrice: v.unitPrice, stockQty: v.stockQty },
+          body: {
+            name: v.name,
+            category: v.category,
+            costPrice: v.costPrice,
+            stockQty: v.stockQty,
+          },
         });
         toast(t("prod.updated"));
         const f = currentProductFilter();

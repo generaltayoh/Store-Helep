@@ -1,6 +1,4 @@
-import { db, nextId } from "../data/store.js";
-import { resolveRange } from "../services/analyticsService.js";
-import { isDbConfigured } from "../config/db.js";
+import { recordProfit } from "../services/profitService.js";
 import { dbService } from "../services/dbService.js";
 
 function startOfDay(d) {
@@ -21,33 +19,16 @@ function dayLabel(ts) {
   });
 }
 
-function filterRecords(filter, from, to) {
-  switch (filter) {
-    case "needs_review":
-      return db.records.filter((r) => r.status === "needs_review");
-    case "today":
-    case "this_week":
-    case "this_month":
-    case "custom": {
-      const { from: f, to: t } = resolveRange(filter, from, to);
-      return db.records.filter((r) => r.timestamp >= f && r.timestamp <= t);
-    }
-    default:
-      return [...db.records];
-  }
-}
-
 export async function listRecords(req, res, next) {
   try {
     const { filter = "all", from, to } = req.query;
 
-    let records = [];
-    if (isDbConfigured()) {
-      records = await dbService.listRecords({ filter, from, to });
-    } else {
-      records = filterRecords(filter, from, to);
-      records.sort((a, b) => b.timestamp - a.timestamp);
-    }
+    const records = await dbService.listRecords({
+      filter,
+      from,
+      to,
+      businessId: req.businessId,
+    });
 
     // Group by calendar day.
     const groups = new Map();
@@ -59,6 +40,8 @@ export async function listRecords(req, res, next) {
         productName: r.productName,
         quantity: r.quantity,
         unitPrice: r.unitPrice,
+        costPrice: r.costPrice || 0,
+        profit: recordProfit(r),
         amount: r.amount,
         timestamp: r.timestamp,
         time: new Date(r.timestamp).toLocaleTimeString("en-CM", {
@@ -80,13 +63,7 @@ export async function listRecords(req, res, next) {
 
 export async function getRecord(req, res, next) {
   try {
-    if (isDbConfigured()) {
-      const record = await dbService.getRecord(req.params.id);
-      if (!record) return res.status(404).json({ error: "Record not found." });
-      return res.json({ record });
-    }
-
-    const record = db.records.find((r) => r.id === req.params.id);
+    const record = await dbService.getRecord(req.params.id);
     if (!record) return res.status(404).json({ error: "Record not found." });
     res.json({ record });
   } catch (err) {
@@ -97,39 +74,27 @@ export async function getRecord(req, res, next) {
 // Manual record entry.
 export async function createRecord(req, res, next) {
   try {
-    const { productId, productName, quantity, unitPrice, timestamp, status } = req.body;
+    const { productId, productName, quantity, unitPrice, costPrice, timestamp, status } = req.body;
     if (!productName || !quantity || unitPrice === undefined) {
       return res
         .status(400)
         .json({ error: "productName, quantity and unitPrice are required." });
     }
-
-    if (isDbConfigured()) {
-      const record = await dbService.createRecord({
-        productId,
-        productName,
-        quantity: Number(quantity),
-        unitPrice: Number(unitPrice),
-        timestamp,
-        source: "manual",
-        status: status === "needs_review" ? "needs_review" : "saved",
-      });
-      return res.status(201).json({ record });
+    if (costPrice !== undefined && costPrice !== null && Number(costPrice) < 0) {
+      return res.status(400).json({ error: "costPrice must be zero or more." });
     }
 
-    const record = {
-      id: nextId("rec"),
-      productId: productId || null,
+    const record = await dbService.createRecord({
+      productId,
       productName,
       quantity: Number(quantity),
       unitPrice: Number(unitPrice),
-      amount: Number(quantity) * Number(unitPrice),
-      timestamp: timestamp ? new Date(timestamp) : new Date(),
+      costPrice,
+      timestamp,
       source: "manual",
       status: status === "needs_review" ? "needs_review" : "saved",
-      scanId: null,
-    };
-    db.records.push(record);
+      businessId: req.businessId,
+    });
     res.status(201).json({ record });
   } catch (err) {
     next(err);
@@ -138,34 +103,19 @@ export async function createRecord(req, res, next) {
 
 export async function updateRecord(req, res, next) {
   try {
-    const { productName, quantity, unitPrice, status } = req.body;
+    const { productName, quantity, unitPrice, costPrice, status } = req.body;
 
-    if (isDbConfigured()) {
-      const existing = await dbService.getRecord(req.params.id);
-      if (!existing) return res.status(404).json({ error: "Record not found." });
+    const existing = await dbService.getRecord(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Record not found." });
 
-      const updated = await dbService.updateRecord(req.params.id, {
-        productName,
-        quantity,
-        unitPrice,
-        status,
-      });
-      return res.json({ record: updated });
-    }
-
-    const record = db.records.find((r) => r.id === req.params.id);
-    if (!record) return res.status(404).json({ error: "Record not found." });
-    if (productName !== undefined) record.productName = productName;
-    if (quantity !== undefined) {
-      record.quantity = Number(quantity);
-      record.amount = record.quantity * record.unitPrice;
-    }
-    if (unitPrice !== undefined) {
-      record.unitPrice = Number(unitPrice);
-      record.amount = record.quantity * record.unitPrice;
-    }
-    if (status !== undefined) record.status = status;
-    res.json({ record });
+    const updated = await dbService.updateRecord(req.params.id, {
+      productName,
+      quantity,
+      unitPrice,
+      costPrice,
+      status,
+    });
+    res.json({ record: updated });
   } catch (err) {
     next(err);
   }

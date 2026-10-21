@@ -1,27 +1,21 @@
-import { db } from "../data/store.js";
-import {
-  listProducts,
-  withStatus,
-  productStats,
-  createProduct,
-  findProduct,
-} from "../services/inventoryService.js";
-import { isDbConfigured } from "../config/db.js";
 import { dbService } from "../services/dbService.js";
+
+// Cost price is optional. Returns undefined when absent, null when invalid.
+function parseCostPrice(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
 
 export async function getProducts(req, res, next) {
   try {
     const { category, stockStatus } = req.query;
-
-    if (isDbConfigured()) {
-      const products = await dbService.listProducts({ category, stockStatus, businessId: req.businessId });
-      return res.json({ products, count: products.length });
-    }
-
-    const products = listProducts({ category, stockStatus }).map((p) => ({
-      ...p,
-      stockValue: p.unitPrice * p.stockQty,
-    }));
+    const products = await dbService.listProducts({
+      category,
+      stockStatus,
+      businessId: req.businessId,
+    });
     res.json({ products, count: products.length });
   } catch (err) {
     next(err);
@@ -30,12 +24,7 @@ export async function getProducts(req, res, next) {
 
 export async function getProductStats(req, res, next) {
   try {
-    if (isDbConfigured()) {
-      const stats = await dbService.getProductStats();
-      return res.json({ ...stats });
-    }
-
-    const stats = productStats();
+    const stats = await dbService.getProductStats(req.businessId);
     res.json({ ...stats });
   } catch (err) {
     next(err);
@@ -44,26 +33,26 @@ export async function getProductStats(req, res, next) {
 
 export async function createProductHandler(req, res, next) {
   try {
-    const { name, category, unitPrice, stockQty } = req.body;
-    if (!name || !category || unitPrice === undefined) {
-      return res
-        .status(400)
-        .json({ error: "name, category and unitPrice are required." });
+    // Only the cost price is entered by hand. The selling price is learned
+    // from the scans, never typed in.
+    const { name, category, costPrice, stockQty } = req.body;
+    if (!name || !category) {
+      return res.status(400).json({ error: "name and category are required." });
     }
 
-    if (isDbConfigured()) {
-      const product = await dbService.createProduct({
-        name,
-        category,
-        unitPrice,
-        stockQty: stockQty || 0,
-      });
-      return res.status(201).json({ product });
+    const cost = parseCostPrice(costPrice);
+    if (cost === null) {
+      return res.status(400).json({ error: "costPrice must be zero or more." });
     }
 
-    const product = createProduct({ name, category, unitPrice, stockQty: stockQty || 0 });
-    db.products.push(product);
-    res.status(201).json({ product: withStatus(product) });
+    const product = await dbService.createProduct({
+      name,
+      category,
+      costPrice: cost || 0,
+      stockQty: stockQty || 0,
+      businessId: req.businessId,
+    });
+    res.status(201).json({ product });
   } catch (err) {
     next(err);
   }
@@ -71,15 +60,9 @@ export async function createProductHandler(req, res, next) {
 
 export async function getProduct(req, res, next) {
   try {
-    if (isDbConfigured()) {
-      const product = await dbService.getProduct(req.params.id);
-      if (!product) return res.status(404).json({ error: "Product not found." });
-      return res.json({ product });
-    }
-
-    const product = findProduct(req.params.id);
+    const product = await dbService.getProduct(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found." });
-    res.json({ product: withStatus(product) });
+    res.json({ product });
   } catch (err) {
     next(err);
   }
@@ -87,27 +70,25 @@ export async function getProduct(req, res, next) {
 
 export async function updateProduct(req, res, next) {
   try {
-    const { name, category, unitPrice, stockQty } = req.body;
+    // Only the cost price is editable by hand; the selling price comes from
+    // the scans.
+    const { name, category, costPrice, stockQty } = req.body;
 
-    if (isDbConfigured()) {
-      const product = await dbService.getProduct(req.params.id);
-      if (!product) return res.status(404).json({ error: "Product not found." });
-      const updated = await dbService.updateProduct(req.params.id, {
-        name,
-        category,
-        unitPrice,
-        stockQty,
-      });
-      return res.json({ product: updated });
+    const cost = parseCostPrice(costPrice);
+    if (cost === null) {
+      return res.status(400).json({ error: "costPrice must be zero or more." });
     }
 
-    const product = findProduct(req.params.id);
+    const product = await dbService.getProduct(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found." });
-    if (name !== undefined) product.name = name;
-    if (category !== undefined) product.category = category;
-    if (unitPrice !== undefined) product.unitPrice = Number(unitPrice);
-    if (stockQty !== undefined) product.stockQty = Number(stockQty);
-    res.json({ product: withStatus(product) });
+
+    const updated = await dbService.updateProduct(req.params.id, {
+      name,
+      category,
+      costPrice: cost,
+      stockQty,
+    });
+    res.json({ product: updated });
   } catch (err) {
     next(err);
   }
@@ -115,16 +96,10 @@ export async function updateProduct(req, res, next) {
 
 export async function deleteProduct(req, res, next) {
   try {
-    if (isDbConfigured()) {
-      const product = await dbService.getProduct(req.params.id);
-      if (!product) return res.status(404).json({ error: "Product not found." });
-      await dbService.deleteProduct(req.params.id);
-      return res.status(204).send();
-    }
-    const idx = db.products.findIndex((p) => p.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: "Product not found." });
-    db.products.splice(idx, 1);
-    return res.status(204).send();
+    const product = await dbService.getProduct(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found." });
+    await dbService.deleteProduct(req.params.id);
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -137,17 +112,10 @@ export async function restockProduct(req, res, next) {
       return res.status(400).json({ error: "addQty must be a positive number." });
     }
 
-    if (isDbConfigured()) {
-      const product = await dbService.getProduct(req.params.id);
-      if (!product) return res.status(404).json({ error: "Product not found." });
-      const updated = await dbService.restockProduct(req.params.id, addQty);
-      return res.json({ product: updated });
-    }
-
-    const product = findProduct(req.params.id);
+    const product = await dbService.getProduct(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found." });
-    product.stockQty = (product.stockQty || 0) + addQty;
-    res.json({ product: withStatus(product) });
+    const updated = await dbService.restockProduct(req.params.id, addQty);
+    res.json({ product: updated });
   } catch (err) {
     next(err);
   }

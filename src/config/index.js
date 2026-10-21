@@ -28,7 +28,6 @@ function loadEnv() {
 loadEnv();
 
 const LOW_STOCK_THRESHOLD = 5;
-const ESTIMATED_PROFIT_MARGIN = 0.15;
 
 export const config = {
   port: Number(process.env.PORT) || 3000,
@@ -40,10 +39,10 @@ export const config = {
     },
   },
   lowStockThreshold: Number(process.env.LOW_STOCK_THRESHOLD) || LOW_STOCK_THRESHOLD,
-  profitMargin: Number(process.env.PROFIT_MARGIN) || ESTIMATED_PROFIT_MARGIN,
   // Real AI/OCR provider. Supports "gemini" (native API) and "openai"
   // (OpenAI-compatible vision chat completion). Enabled only when
-  // OCR_ENABLED=true; otherwise ocrService falls back to mock. The key is read
+  // OCR_ENABLED=true; when it is off or fails, the scan is rejected with a
+  // clear error — no fake extraction is ever produced. The key is read
   // from .env (OCR_API_KEY) and never exposed to the client.
   ai: {
     provider: (process.env.OCR_PROVIDER || "gemini").toLowerCase(),

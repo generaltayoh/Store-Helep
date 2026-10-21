@@ -1,6 +1,16 @@
 process.env.SKIP_ENV_FILE = "true";
 
-const { isDbConfigured, getPool } = await import("../src/config/db.js");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, "..");
+
+const TEST_DB_URL = process.env.TEST_DATABASE_URL;
+if (TEST_DB_URL) process.env.DATABASE_URL = TEST_DB_URL;
+
+const { isDbConfigured, getPool, requirePool } = await import("../src/config/db.js");
 const { dbService } = await import("../src/services/dbService.js");
 
 let passed = 0;
@@ -16,11 +26,16 @@ function check(name, cond, extra = "") {
   }
 }
 
+function readProjectFile(relPath) {
+  return fs.readFileSync(path.join(projectRoot, relPath), "utf8");
+}
+
 async function runTests() {
   console.log("Running PostgreSQL (Neon) service unit & interface tests...");
 
   check("isDbConfigured export is a function", typeof isDbConfigured === "function");
   check("getPool export is a function", typeof getPool === "function");
+  check("requirePool export is a function", typeof requirePool === "function");
 
   // Verify all expected repository methods exist on dbService
   const methods = [
@@ -56,20 +71,25 @@ async function runTests() {
   }
 
   if (!isDbConfigured()) {
-    // Unconfigured (no DATABASE_URL): helpers return null or fallback values safely
+    // Unconfigured: every call must fail loudly instead of returning empty or
+    // fake data.
     check("getPool returns null when DATABASE_URL is not set", getPool() === null);
 
-    const biz = await dbService.getBusiness();
-    check("dbService.getBusiness returns null when unconfigured", biz === null);
+    let thrown = null;
+    try {
+      requirePool();
+    } catch (e) {
+      thrown = e;
+    }
+    check("requirePool throws a 503 when DATABASE_URL is not set", thrown?.status === 503);
 
-    const products = await dbService.listProducts();
-    check("dbService.listProducts returns empty array when unconfigured", Array.isArray(products) && products.length === 0);
-
-    const records = await dbService.listRecords();
-    check("dbService.listRecords returns empty array when unconfigured", Array.isArray(records) && records.length === 0);
-
-    const scans = await dbService.listScans();
-    check("dbService.listScans returns empty array when unconfigured", Array.isArray(scans) && scans.length === 0);
+    thrown = null;
+    try {
+      await dbService.listProducts();
+    } catch (e) {
+      thrown = e;
+    }
+    check("dbService.listProducts throws when unconfigured", thrown?.status === 503);
   } else {
     // Configured: verify basic connectivity
     try {
@@ -80,6 +100,39 @@ async function runTests() {
       check("database connection works (SELECT 1)", false, e.message);
     }
   }
+
+  // --------------------------------------------------------------------------
+  // No mock / demo data may exist in the system.
+  // --------------------------------------------------------------------------
+  check("no in-memory store module", !fs.existsSync(path.join(projectRoot, "src", "data", "store.js")));
+  check("no seed data module", !fs.existsSync(path.join(projectRoot, "src", "data", "seed.js")));
+  check("no seed SQL file", !fs.existsSync(path.join(projectRoot, "db", "seed.sql")));
+  check(
+    "server does not seed on start",
+    !/SEED_ON_START|seed\(\)/.test(readProjectFile("server.js"))
+  );
+
+  const sourceFiles = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".js")) sourceFiles.push(full);
+    }
+  };
+  walk(path.join(projectRoot, "src"));
+
+  const offenders = sourceFiles.filter((f) => {
+    const src = fs.readFileSync(f, "utf8");
+    return /from\s+["'].*data\/store\.js["']/.test(src);
+  });
+  check("no source file imports the mock store", offenders.length === 0, offenders.join(", "));
+
+  const mockFallbacks = sourceFiles.filter((f) => {
+    const src = fs.readFileSync(f, "utf8");
+    return /isDbConfigured\(\)/.test(src) && !f.endsWith("db.js") && !f.endsWith("schemaService.js");
+  });
+  check("no controller falls back to mock data", mockFallbacks.length === 0, mockFallbacks.join(", "));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

@@ -1,18 +1,16 @@
-import { analytics } from "../services/analyticsService.js";
 import { formatCurrency } from "../services/currency.js";
-import { isDbConfigured } from "../config/db.js";
 import { dbService } from "../services/dbService.js";
 
 export async function getAnalytics(req, res, next) {
   try {
     const { range, from, to, productId, lang } = req.query;
-    let data;
-
-    if (isDbConfigured()) {
-      data = await dbService.analytics({ range, from, to, productId, businessId: req.businessId });
-    } else {
-      data = analytics({ range, from, to, productId });
-    }
+    const data = await dbService.analytics({
+      range,
+      from,
+      to,
+      productId,
+      businessId: req.businessId,
+    });
 
     const trendLabel = { up: "↑", down: "↓", steady: "→" };
 

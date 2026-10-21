@@ -5,6 +5,10 @@
 -- Usage: paste this file into the Neon SQL Editor (or run with psql) against
 -- your Neon database. gen_random_uuid() is built into PostgreSQL 13+, so no
 -- extensions are required.
+--
+-- WARNING: this script DROPs every table first — it wipes all existing data.
+-- Only run it on a brand-new/empty database. For an existing database use
+-- db/migrations/001_add_cost_price.sql instead (it only adds columns).
 -- ============================================================================
 
 -- ============================================================================
@@ -58,7 +62,10 @@ CREATE TABLE products (
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
+    -- unit_price: last price the product was actually sold at (learned from
+    --              scans). cost_price: what the store paid for one unit.
     unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (unit_price >= 0),
+    cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
     stock_qty INTEGER NOT NULL DEFAULT 0 CHECK (stock_qty >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
@@ -111,7 +118,10 @@ CREATE TABLE records (
     product_id UUID REFERENCES products(id) ON DELETE SET NULL,
     product_name TEXT NOT NULL,
     quantity NUMERIC(10, 2) NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    -- unit_price: the selling price seen in the scan. cost_price: the cost
+    -- price of the product, snapshotted at the moment of the sale.
     unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (unit_price >= 0),
+    cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (cost_price >= 0),
     amount NUMERIC(14, 2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
     timestamp TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('scanned', 'manual')),

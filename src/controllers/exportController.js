@@ -1,25 +1,6 @@
 import ExcelJS from "exceljs";
-import { db } from "../data/store.js";
-import { resolveRange } from "../services/analyticsService.js";
-import { withStatus } from "../services/inventoryService.js";
-import { isDbConfigured } from "../config/db.js";
+import { recordProfit } from "../services/profitService.js";
 import { dbService } from "../services/dbService.js";
-
-function filterRecordsForExport(filter, from, to) {
-  switch (filter) {
-    case "needs_review":
-      return db.records.filter((r) => r.status === "needs_review");
-    case "today":
-    case "this_week":
-    case "this_month":
-    case "custom": {
-      const { from: f, to: t } = resolveRange(filter, from, to);
-      return db.records.filter((r) => r.timestamp >= f && r.timestamp <= t);
-    }
-    default:
-      return [...db.records];
-  }
-}
 
 function sendWorkbook(res, workbook, fileName) {
   res.setHeader(
@@ -33,15 +14,12 @@ function sendWorkbook(res, workbook, fileName) {
 export async function exportRecords(req, res, next) {
   try {
     const { filter = "all", from, to } = req.query;
-    let records = [];
-
-    if (isDbConfigured()) {
-      records = await dbService.listRecords({ filter, from, to });
-    } else {
-      records = filterRecordsForExport(filter, from, to).sort(
-        (a, b) => b.timestamp - a.timestamp
-      );
-    }
+    const records = await dbService.listRecords({
+      filter,
+      from,
+      to,
+      businessId: req.businessId,
+    });
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "Store Helep";
@@ -53,8 +31,10 @@ export async function exportRecords(req, res, next) {
       { header: "Time", key: "time", width: 12 },
       { header: "Product", key: "product", width: 28 },
       { header: "Quantity", key: "quantity", width: 12 },
-      { header: "Unit Price", key: "unitPrice", width: 14 },
+      { header: "Selling Price", key: "unitPrice", width: 14 },
+      { header: "Cost Price", key: "costPrice", width: 14 },
       { header: "Amount", key: "amount", width: 14 },
+      { header: "Est. Profit", key: "profit", width: 14 },
       { header: "Source", key: "source", width: 12 },
       { header: "Status", key: "status", width: 14 },
     ];
@@ -67,7 +47,9 @@ export async function exportRecords(req, res, next) {
         product: r.productName,
         quantity: r.quantity,
         unitPrice: r.unitPrice,
+        costPrice: r.costPrice || 0,
         amount: r.amount,
+        profit: Math.round(recordProfit(r)),
         source: r.source,
         status: r.status,
       });
@@ -82,37 +64,33 @@ export async function exportRecords(req, res, next) {
 export async function exportProducts(req, res, next) {
   try {
     const { category, stockStatus } = req.query;
-    let products = [];
-
-    if (isDbConfigured()) {
-      products = await dbService.listProducts({ category, stockStatus });
-    } else {
-      products = db.products;
-      if (category) products = products.filter((p) => p.category === category);
-      if (stockStatus && stockStatus !== "all") {
-        products = products.filter((p) => withStatus(p).stockStatus === stockStatus);
-      }
-      products = products.map((p) => withStatus(p));
-    }
+    const products = await dbService.listProducts({
+      category,
+      stockStatus,
+      businessId: req.businessId,
+    });
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Products");
     ws.columns = [
       { header: "Name", key: "name", width: 30 },
       { header: "Category", key: "category", width: 16 },
-      { header: "Unit Price", key: "unitPrice", width: 14 },
+      { header: "Cost Price", key: "costPrice", width: 14 },
+      { header: "Last Selling Price", key: "unitPrice", width: 18 },
       { header: "Stock", key: "stockQty", width: 12 },
       { header: "Stock Value", key: "stockValue", width: 16 },
       { header: "Status", key: "status", width: 14 },
     ];
 
     for (const p of products) {
+      const costPrice = Number(p.costPrice || 0);
       ws.addRow({
         name: p.name,
         category: p.category,
-        unitPrice: p.unitPrice,
+        costPrice,
+        unitPrice: p.unitPrice || 0,
         stockQty: p.stockQty,
-        stockValue: p.unitPrice * p.stockQty,
+        stockValue: costPrice * p.stockQty,
         status: p.stockStatus,
       });
     }

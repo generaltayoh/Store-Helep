@@ -1,7 +1,7 @@
-import { query, getPool } from "../config/db.js";
-import { config } from "../config/index.js";
+import { query, getPool, requirePool } from "../config/db.js";
 import { stockStatus } from "./inventoryService.js";
 import { resolveRange } from "./analyticsService.js";
+import { sumProfit } from "./profitService.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -35,14 +35,18 @@ function mapBusiness(biz, settings) {
 function mapProduct(p) {
   if (!p) return null;
   const stockQty = Number(p.stock_qty || 0);
+  // unit_price holds the last price the product was actually sold at (learned
+  // from scans); cost_price is what the store paid for one unit.
   const unitPrice = Number(p.unit_price || 0);
+  const costPrice = Number(p.cost_price || 0);
   return {
     id: p.id,
     name: p.name,
     category: p.category,
     unitPrice,
+    costPrice,
     stockQty,
-    stockValue: unitPrice * stockQty,
+    stockValue: costPrice * stockQty,
     stockStatus: stockStatus(stockQty),
   };
 }
@@ -56,6 +60,7 @@ function mapRecord(r) {
     productName: r.product_name,
     quantity: Number(r.quantity || 0),
     unitPrice: Number(r.unit_price || 0),
+    costPrice: Number(r.cost_price || 0),
     amount: Number(r.amount || 0),
     timestamp: new Date(r.timestamp),
     source: r.source,
@@ -121,7 +126,7 @@ async function mapScan(scan, items = []) {
 }
 
 async function withTransaction(fn) {
-  const pool = getPool();
+  const pool = requirePool();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -141,7 +146,7 @@ export const dbService = {
   // Business & Settings
   // --------------------------------------------------------------------------
   async getBusiness(businessId) {
-    if (!getPool()) return null;
+    requirePool();
 
     let biz = null;
     if (businessId) {
@@ -158,7 +163,7 @@ export const dbService = {
   },
 
   async findBusinessByToken(token) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query(
       "SELECT id, name, email, token, type, currency, location, record_method, created_at, updated_at FROM businesses WHERE token = $1",
       [token]
@@ -167,7 +172,7 @@ export const dbService = {
   },
 
   async findBusinessByNameAndPhone(name, phone) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query("SELECT * FROM businesses WHERE name = $1 AND email = $2", [name, phone]);
     const biz = rows[0] || null;
     if (!biz) return null;
@@ -176,19 +181,19 @@ export const dbService = {
   },
 
   async findByName(name) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query("SELECT * FROM businesses WHERE name = $1", [name]);
     return rows[0] || null;
   },
 
   async findByPhone(phone) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query("SELECT * FROM businesses WHERE email = $1", [phone]);
     return rows[0] || null;
   },
 
   async getBusinessById(id) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query("SELECT * FROM businesses WHERE id = $1", [id]);
     const biz = rows[0] || null;
     if (!biz) return null;
@@ -197,7 +202,7 @@ export const dbService = {
   },
 
   async loginBusiness({ businessName, businessEmail, token }) {
-    if (!getPool()) return null;
+    requirePool();
 
     return withTransaction(async (client) => {
       const { rows } = await client.query("SELECT * FROM businesses WHERE email = $1", [businessEmail]);
@@ -232,7 +237,7 @@ export const dbService = {
   },
 
   async updateBusiness(id, updates) {
-    if (!getPool()) return null;
+    requirePool();
 
     const colMap = {
       name: "name",
@@ -296,7 +301,7 @@ export const dbService = {
   // Products / Inventory
   // --------------------------------------------------------------------------
   async listProducts({ category, stockStatus: statusFilter, businessId } = {}) {
-    if (!getPool()) return [];
+    requirePool();
 
     const conditions = [];
     const vals = [];
@@ -320,13 +325,15 @@ export const dbService = {
   },
 
   async getProduct(id) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query("SELECT * FROM products WHERE id = $1", [id]);
     return mapProduct(rows[0] || null);
   },
 
-  async createProduct({ name, category, unitPrice, stockQty = 0, businessId }) {
-    if (!getPool()) return null;
+  // The catalog holds the cost price only. unitPrice is the last price the
+  // product was sold at, which is set from the scans.
+  async createProduct({ name, category, unitPrice = 0, costPrice = 0, stockQty = 0, businessId }) {
+    requirePool();
 
     let targetBizId = businessId;
     if (!targetBizId) {
@@ -335,21 +342,29 @@ export const dbService = {
     }
 
     const { rows } = await query(
-      `INSERT INTO products (business_id, name, category, unit_price, stock_qty)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO products (business_id, name, category, unit_price, cost_price, stock_qty)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [targetBizId, name, category, Number(unitPrice), Number(stockQty)]
+      [
+        targetBizId,
+        name,
+        category,
+        Number(unitPrice),
+        Number(costPrice) || 0,
+        Number(stockQty),
+      ]
     );
     return mapProduct(rows[0]);
   },
 
   async updateProduct(id, updates) {
-    if (!getPool()) return null;
+    requirePool();
 
     const payload = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.category !== undefined) payload.category = updates.category;
     if (updates.unitPrice !== undefined) payload.unit_price = Number(updates.unitPrice);
+    if (updates.costPrice !== undefined) payload.cost_price = Number(updates.costPrice);
     if (updates.stockQty !== undefined) payload.stock_qty = Number(updates.stockQty);
 
     const keys = Object.keys(payload);
@@ -365,7 +380,7 @@ export const dbService = {
   },
 
   async deleteProduct(id) {
-    if (!getPool()) return false;
+    requirePool();
     const { rowCount } = await query("DELETE FROM products WHERE id = $1", [id]);
     return rowCount > 0;
   },
@@ -384,7 +399,8 @@ export const dbService = {
     let outOfStockCount = 0;
 
     for (const p of products) {
-      totalStockValue += p.unitPrice * p.stockQty;
+      // Stock is valued at cost: the catalog only knows what the store paid.
+      totalStockValue += (p.costPrice || 0) * p.stockQty;
       if (p.stockStatus === "low_stock") lowStockCount++;
       if (p.stockStatus === "out_of_stock") outOfStockCount++;
     }
@@ -401,7 +417,7 @@ export const dbService = {
   // Records
   // --------------------------------------------------------------------------
   async listRecords({ filter = "all", from, to, businessId } = {}) {
-    if (!getPool()) return [];
+    requirePool();
 
     const conditions = [];
     const vals = [];
@@ -423,7 +439,7 @@ export const dbService = {
   },
 
   async getRecord(id) {
-    if (!getPool()) return null;
+    requirePool();
     const { rows } = await query("SELECT * FROM records WHERE id = $1", [id]);
     return mapRecord(rows[0] || null);
   },
@@ -433,13 +449,14 @@ export const dbService = {
     productName,
     quantity,
     unitPrice,
+    costPrice,
     timestamp,
     source = "manual",
     status = "saved",
     scanId = null,
     businessId,
   }) {
-    if (!getPool()) return null;
+    requirePool();
 
     let targetBizId = businessId;
     if (!targetBizId) {
@@ -451,9 +468,28 @@ export const dbService = {
     const price = Number(unitPrice);
     const amount = qty * price;
 
+    // Snapshot the product's cost price onto the sale so that editing the
+    // catalog later never rewrites the profit of this record.
+    let cost = costPrice === undefined || costPrice === null ? undefined : Number(costPrice);
+    if (cost === undefined && productId) {
+      const { rows: prodRows } = await query(
+        "SELECT cost_price FROM products WHERE id = $1",
+        [productId]
+      );
+      cost = Number(prodRows[0]?.cost_price || 0);
+    }
+    if (cost === undefined && productName && targetBizId) {
+      const { rows: prodRows } = await query(
+        "SELECT cost_price FROM products WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+        [targetBizId, productName]
+      );
+      cost = Number(prodRows[0]?.cost_price || 0);
+    }
+    if (cost === undefined) cost = 0;
+
     const { rows } = await query(
-      `INSERT INTO records (business_id, product_id, product_name, quantity, unit_price, amount, timestamp, source, status, scan_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO records (business_id, product_id, product_name, quantity, unit_price, cost_price, amount, timestamp, source, status, scan_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         targetBizId,
@@ -461,6 +497,7 @@ export const dbService = {
         productName,
         qty,
         price,
+        cost,
         amount,
         timestamp ? new Date(timestamp) : new Date(),
         source,
@@ -472,12 +509,13 @@ export const dbService = {
   },
 
   async updateRecord(id, updates) {
-    if (!getPool()) return null;
+    requirePool();
 
     const payload = {};
     if (updates.productName !== undefined) payload.product_name = updates.productName;
     if (updates.quantity !== undefined) payload.quantity = Number(updates.quantity);
     if (updates.unitPrice !== undefined) payload.unit_price = Number(updates.unitPrice);
+    if (updates.costPrice !== undefined) payload.cost_price = Number(updates.costPrice);
     if (updates.status !== undefined) payload.status = updates.status;
 
     if (payload.quantity !== undefined || payload.unit_price !== undefined) {
@@ -503,7 +541,7 @@ export const dbService = {
   // Scans & Extracted Items
   // --------------------------------------------------------------------------
   async createScan({ fileName, imageUrl = null, extracted = [], businessId }) {
-    if (!getPool()) return null;
+    requirePool();
 
     let targetBizId = businessId;
     if (!targetBizId) {
@@ -549,7 +587,7 @@ export const dbService = {
   },
 
   async listScans(businessId) {
-    if (!getPool()) return [];
+    requirePool();
 
     let scans;
     if (businessId) {
@@ -578,7 +616,7 @@ export const dbService = {
   },
 
   async getScan(id) {
-    if (!getPool()) return null;
+    requirePool();
 
     const { rows: scans } = await query("SELECT * FROM scans WHERE id = $1", [id]);
     const scan = scans[0] || null;
@@ -593,13 +631,13 @@ export const dbService = {
   },
 
   async deleteScan(id) {
-    if (!getPool()) return false;
+    requirePool();
     const { rowCount } = await query("DELETE FROM scans WHERE id = $1", [id]);
     return rowCount > 0;
   },
 
   async updateExtractedRow(scanId, rowId, updates) {
-    if (!getPool()) return null;
+    requirePool();
 
     const payload = {};
     if (updates.productName !== undefined) payload.product_name = updates.productName;
@@ -645,6 +683,7 @@ export const dbService = {
 
     // Helper to find or create product, and restock matched products
     async function findOrCreateProduct(row) {
+      const scannedPrice = Number(row.unitPrice || row.unit_price || 0);
       const match = currentProducts.find(
         (p) => String(p.name).toLowerCase() === String(row.productName || row.product_name || "").toLowerCase()
       );
@@ -652,30 +691,35 @@ export const dbService = {
         // Sales reduce stock
         const current = await dbService.getProduct(match.id);
         const newStock = Math.max(0, (current?.stockQty || 0) - Number(row.quantity || 1));
-        await dbService.updateProduct(match.id, { stockQty: newStock });
-        return match.id;
+        // The selling price is learned from the scan: remember the price this
+        // product was actually sold at.
+        await dbService.updateProduct(match.id, { stockQty: newStock, unitPrice: scannedPrice });
+        // Snapshot the cost price so the profit of this sale stays stable.
+        return { productId: match.id, costPrice: Number(match.costPrice || 0) };
       }
       // Create new product for unknown/unmatched items
       const newProd = await dbService.createProduct({
         name: row.productName || row.product_name || "Unknown item",
         category: "Other",
-        unitPrice: Number(row.unitPrice || row.unit_price || 0),
+        unitPrice: scannedPrice,
+        costPrice: 0,
         stockQty: 0,
         businessId: defaultBizId,
       });
-      return newProd ? newProd.id : null;
+      return { productId: newProd ? newProd.id : null, costPrice: 0 };
     }
 
     const recordsToInsert = [];
     const confirmedAt = new Date();
     for (const row of scan.extracted || []) {
-      const productId = await findOrCreateProduct(row);
+      const { productId, costPrice } = await findOrCreateProduct(row);
       recordsToInsert.push([
         defaultBizId,
         productId,
         row.productName || row.product_name,
         Number(row.quantity || 1),
         Number(row.unitPrice || row.unit_price || 0),
+        costPrice,
         Number(row.quantity || 1) * Number(row.unitPrice || row.unit_price || 0),
         scan.createdAt || confirmedAt,
         "scanned",
@@ -689,11 +733,11 @@ export const dbService = {
         const vals = [];
         const tuples = recordsToInsert.map((r) => {
           vals.push(...r);
-          const b = vals.length - 10;
-          return `(${Array.from({ length: 10 }, (_, i) => `$${b + i + 1}`).join(", ")})`;
+          const b = vals.length - 11;
+          return `(${Array.from({ length: 11 }, (_, i) => `$${b + i + 1}`).join(", ")})`;
         });
         await client.query(
-          `INSERT INTO records (business_id, product_id, product_name, quantity, unit_price, amount, timestamp, source, status, scan_id)
+          `INSERT INTO records (business_id, product_id, product_name, quantity, unit_price, cost_price, amount, timestamp, source, status, scan_id)
            VALUES ${tuples.join(", ")}`,
           vals
         );
@@ -748,7 +792,7 @@ export const dbService = {
       salesToday,
       salesDeltaPct,
       transactionsToday: todayRecords.length,
-      estimatedProfit: Math.round(salesToday * config.profitMargin),
+      estimatedProfit: Math.round(sumProfit(todayRecords)),
       unitsSold,
       lowStockCount: stats.lowStockCount,
       outOfStockCount: stats.outOfStockCount,
@@ -781,7 +825,7 @@ export const dbService = {
     const totalSales = records.reduce((s, r) => s + (r.amount || 0), 0);
     const numberOfSales = records.length;
     const avgTransaction = numberOfSales > 0 ? Math.round(totalSales / numberOfSales) : 0;
-    const estimatedProfit = Math.round(totalSales * config.profitMargin);
+    const estimatedProfit = Math.round(sumProfit(records));
 
     const weekFrom = now - 7 * DAY;
     let weekRecords = savedRecords.filter(
@@ -862,7 +906,7 @@ export const dbService = {
   },
 
   async clearAllData(businessId) {
-    if (!getPool()) return;
+    requirePool();
     const biz = businessId ? null : await this.getBusiness();
     const targetBizId = businessId || biz?.id;
     if (!targetBizId) return;

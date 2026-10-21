@@ -35,20 +35,16 @@ app.use("/api/export", exportRoutes);
 // Serve the existing static frontend.
 app.use(express.static(projectRoot));
 
-import { db, resetStore } from "./data/store.js";
-import { isDbConfigured } from "./config/db.js";
 import { dbService } from "./services/dbService.js";
 
 app.post("/api/clear", async (_req, res) => {
-  resetStore();
-  if (isDbConfigured()) {
-    try {
-      await dbService.clearAllData();
-    } catch (e) {
-      console.error("[clear] Database clear failed:", e.message);
-    }
+  try {
+    await dbService.clearAllData();
+    res.json({ cleared: true });
+  } catch (e) {
+    console.error("[clear] Database clear failed:", e.message);
+    res.status(503).json({ error: "Could not clear the database." });
   }
-  res.json({ cleared: true });
 });
 
 // Health check.

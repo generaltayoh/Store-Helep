@@ -1,18 +1,10 @@
-import { dashboard } from "../services/analyticsService.js";
 import { formatCurrency, statusLabel } from "../services/currency.js";
-import { isDbConfigured } from "../config/db.js";
 import { dbService } from "../services/dbService.js";
 
 export async function getDashboard(req, res, next) {
   try {
     const lang = req.query.lang;
-    let data;
-
-    if (isDbConfigured()) {
-      data = await dbService.dashboard(req.businessId);
-    } else {
-      data = dashboard();
-    }
+    const data = await dbService.dashboard(req.businessId);
 
     res.json({
       ...data,
