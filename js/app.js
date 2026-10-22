@@ -439,7 +439,12 @@ async function api(path, { method = "GET", body, auth = true, _retried = false }
 async function downloadExcel(path) {
   const headers = {};
   if (state.token) headers["Authorization"] = "Bearer " + state.token;
-  const res = await fetch(API_BASE + path, { headers });
+  // Callers may pass either "/export/..." or "/api/export/..."; API_BASE
+  // already ends with "/api", so avoid producing "/api/api/...".
+  const exportUrl = path.startsWith("/api/")
+    ? API_BASE.replace(/\/api$/, "") + path
+    : API_BASE + path;
+  const res = await fetch(exportUrl, { headers });
   if (!res.ok) {
     let msg = res.statusText;
     try {
