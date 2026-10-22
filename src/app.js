@@ -21,6 +21,13 @@ export const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Compatibility: older cached frontends may still call "/api/api/..." because
+// API_BASE already includes "/api". Normalise those paths instead of 404ing.
+app.use((req, _res, next) => {
+  if (req.url.startsWith("/api/api/")) req.url = req.url.slice(4);
+  next();
+});
+
 // API routes (mounted before static so they take precedence).
 app.use("/api/auth", authRoutes);
 app.use(tokenAuth);

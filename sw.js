@@ -1,5 +1,5 @@
 /* Store Helep service worker — offline shell for an installable PWA. */
-const CACHE = "store-helep-v4";
+const CACHE = "store-helep-v5";
 const APP_SHELL = [
   "landing.html",
   "login.html",

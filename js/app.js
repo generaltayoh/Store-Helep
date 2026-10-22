@@ -1288,7 +1288,7 @@ async function initDashboard() {
           await downloadExcel("/api/export/records/excel");
         } catch (err) {
           console.error("Excel export failed", err);
-          toast(t("common.error") || "Export failed", "error");
+          toast(err.message || t("common.error") || "Export failed", "error");
         }
       });
     }
