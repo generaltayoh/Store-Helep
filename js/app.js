@@ -960,7 +960,7 @@ function initCamera() {
           const blob = await (await fetch(src)).blob();
           const fd = new FormData();
           fd.append("image", blob, "page.jpg");
-          const scan = await api("/scans", { method: "POST", body: fd, auth: false });
+          const scan = await api("/scans", { method: "POST", body: fd });
           if (!firstId) firstId = scan.id;
         }
         window.location.href = "scan.html?scan=" + encodeURIComponent(firstId);
@@ -1885,7 +1885,7 @@ async function loadScans() {
   let n = heading.nextSibling;
   while (n) {
     const next = n.nextSibling;
-    n.remove();
+    if (n.id !== "scanReview") n.remove();
     n = next;
   }
   if (!scans.length) {
@@ -1942,7 +1942,7 @@ async function loadHistory() {
   }
 }
 
-function initScan() {
+async function initScan() {
   // Gallery upload + review
   let fileInput = document.getElementById("galleryInput");
   if (!fileInput) {
@@ -1966,7 +1966,7 @@ function initScan() {
     fd.append("image", file);
     setScanStatus("scanning");
     try {
-      const scan = await api("/scans", { method: "POST", body: fd, auth: false });
+      const scan = await api("/scans", { method: "POST", body: fd });
       setScanStatus("done");
       if (!scan.extracted || scan.extracted.length === 0) {
         toast("No records found in the image. Please take the photo again.", "error");
@@ -1980,14 +1980,15 @@ function initScan() {
     fileInput.value = "";
   });
 
-  // If loaded with ?scan=, open the review for that scan automatically
+  // If loaded with ?scan=, open the review for that scan automatically.
+  // Load the recent scans first so rendering the review panel cannot be
+  // overwritten while the list is being refreshed.
   const paramsScan = new URLSearchParams(window.location.search);
   const scanParam = paramsScan.get("scan");
+  await loadScans().catch(console.error);
   if (scanParam) {
-    openScanReview(scanParam);
+    await openScanReview(scanParam);
   }
-
-  loadScans().catch(console.error);
 }
 
 function setScanStatus(state, msg = "") {
@@ -2016,7 +2017,10 @@ function renderReview(scan) {
     panel.id = "scanReview";
     panel.className = "card";
     panel.style.cssText = "margin-top:18px;padding:16px;";
-    document.querySelector(".scan-page").appendChild(panel);
+    const page = document.querySelector(".scan-page");
+    const heading = page && page.querySelector("#prevScans");
+    if (heading) heading.insertAdjacentElement("beforebegin", panel);
+    else page.appendChild(panel);
   } else {
     panel.innerHTML = ""; // Clear previous content so new scan replaces old table
   }
