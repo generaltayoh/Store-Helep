@@ -11,7 +11,9 @@ const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 if (TEST_DB_URL) process.env.DATABASE_URL = TEST_DB_URL;
 
 const { isDbConfigured, getPool, requirePool } = await import("../src/config/db.js");
-const { dbService } = await import("../src/services/dbService.js");
+const { dbService, productNameSimilarity, findBestProductMatch } = await import(
+  "../src/services/dbService.js"
+);
 
 let passed = 0;
 let failed = 0;
@@ -133,6 +135,46 @@ async function runTests() {
     return /isDbConfigured\(\)/.test(src) && !f.endsWith("db.js") && !f.endsWith("schemaService.js");
   });
   check("no controller falls back to mock data", mockFallbacks.length === 0, mockFallbacks.join(", "));
+
+  // --------------------------------------------------------------------------
+  // Fuzzy product matching: a scanned name must link to a similar existing
+  // product instead of creating a duplicate.
+  // --------------------------------------------------------------------------
+  const catalog = [
+    { id: "1", name: "Coca-Cola 50cl" },
+    { id: "2", name: "Rice bag 25kg" },
+    { id: "3", name: "Fanta" },
+    { id: "4", name: "Sugar 1kg" },
+  ];
+
+  check(
+    "matches a shorter scan name to the catalog product",
+    findBestProductMatch("Coca", catalog)?.id === "1"
+  );
+  check(
+    "matches case/space/underscore variations",
+    findBestProductMatch("coca_cola 50 CL", catalog)?.id === "1"
+  );
+  check(
+    "matches a scan name with extra qualifiers",
+    findBestProductMatch("Coca Cola 50cl bottle", catalog)?.id === "1"
+  );
+  check(
+    "matches a misspelled scan name",
+    findBestProductMatch("Cocacola 50cl", catalog)?.id === "1"
+  );
+  check(
+    "matches a plural scan name",
+    findBestProductMatch("Fanta bottles", catalog)?.id === "3"
+  );
+  check(
+    "does not match clearly different products",
+    findBestProductMatch("Bread loaf", catalog) === null
+  );
+  check(
+    "an exact match scores 1",
+    productNameSimilarity("Sugar 1kg", "sugar 1 KG") === 1
+  );
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

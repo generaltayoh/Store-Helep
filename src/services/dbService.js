@@ -82,18 +82,84 @@ function mapRecord(r) {
   };
 }
 
-function fuzzyMatch(name, candidates) {
-  const n = (name || "").toLowerCase().trim();
-  for (const c of candidates) {
-    const cn = (c.name || c.productName || "").toLowerCase().trim();
-    if (n === cn) return true;
-    if (n.includes(cn) || cn.includes(n)) return true;
-    const words = cn.split(/\s+/);
-    for (const w of words) {
-      if (w.length > 2 && n.includes(w)) return true;
+// Product names written in notebooks are rarely spelled exactly like the
+// catalog entry ("Coca" vs "Coca-Cola 50cl" vs "coca cola"). Normalise names and
+// compare them so a scanned row is linked to the closest existing product
+// instead of creating a duplicate.
+const PRODUCT_MATCH_THRESHOLD = 0.72;
+
+function normaliseProductName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function productNameSimilarity(a, b) {
+  const na = normaliseProductName(a);
+  const nb = normaliseProductName(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+
+  const compactA = na.replace(/\s+/g, "");
+  const compactB = nb.replace(/\s+/g, "");
+  if (compactA === compactB) return 1;
+
+  const lev =
+    1 - editDistance(compactA, compactB) / Math.max(compactA.length, compactB.length);
+
+  const tokensA = na.split(" ");
+  const tokensB = nb.split(" ");
+  const setB = new Set(tokensB);
+  let common = 0;
+  for (const token of tokensA) {
+    if (setB.has(token)) common++;
+  }
+  const dice = (2 * common) / (tokensA.length + tokensB.length);
+
+  const shorter = na.length <= nb.length ? na : nb;
+  const longer = na.length <= nb.length ? nb : na;
+  const contained = ` ${longer} `.includes(` ${shorter} `) ? 1 : 0;
+
+  return Math.max(lev, dice, contained * 0.96);
+}
+
+function findBestProductMatch(name, products) {
+  let best = null;
+  let bestScore = 0;
+  for (const product of products || []) {
+    const candidate = product.name || product.productName;
+    const score = productNameSimilarity(name, candidate);
+    if (score > bestScore) {
+      best = product;
+      bestScore = score;
     }
   }
-  return false;
+  return bestScore >= PRODUCT_MATCH_THRESHOLD ? best : null;
 }
 
 // Map scan row and extracted items
@@ -107,7 +173,7 @@ async function mapScan(scan, items = []) {
   } catch (e) { /* ignore */ }
   const extracted = (items || []).map((i) => {
     const name = i.product_name || "Unknown item";
-    const isUnknown = productCatalog.length === 0 ? true : !fuzzyMatch(name, productCatalog);
+    const isUnknown = productCatalog.length === 0 ? true : !findBestProductMatch(name, productCatalog);
     return {
       id: i.id,
       productName: name,
@@ -688,10 +754,9 @@ export const dbService = {
 
     // Helper to find or create product, and restock matched products
     async function findOrCreateProduct(row) {
+      const scannedName = row.productName || row.product_name || "Unknown item";
       const scannedPrice = Number(row.unitPrice || row.unit_price || 0);
-      const match = currentProducts.find(
-        (p) => String(p.name).toLowerCase() === String(row.productName || row.product_name || "").toLowerCase()
-      );
+      const match = findBestProductMatch(scannedName, currentProducts);
       if (match) {
         // Sales reduce stock
         const current = await dbService.getProduct(match.id);
@@ -700,28 +765,37 @@ export const dbService = {
         // product was actually sold at.
         await dbService.updateProduct(match.id, { stockQty: newStock, unitPrice: scannedPrice });
         // Snapshot the cost price so the profit of this sale stays stable.
-        return { productId: match.id, costPrice: Number(match.costPrice || 0) };
+        return {
+          productId: match.id,
+          productName: match.name,
+          costPrice: Number(match.costPrice || current?.costPrice || 0),
+        };
       }
       // Create new product for unknown/unmatched items
       const newProd = await dbService.createProduct({
-        name: row.productName || row.product_name || "Unknown item",
+        name: scannedName,
         category: "Other",
         unitPrice: scannedPrice,
         costPrice: 0,
         stockQty: 0,
         businessId: defaultBizId,
       });
-      return { productId: newProd ? newProd.id : null, costPrice: 0 };
+      if (newProd) currentProducts.push(newProd);
+      return {
+        productId: newProd ? newProd.id : null,
+        productName: newProd ? newProd.name : scannedName,
+        costPrice: 0,
+      };
     }
 
     const recordsToInsert = [];
     const confirmedAt = new Date();
     for (const row of scan.extracted || []) {
-      const { productId, costPrice } = await findOrCreateProduct(row);
+      const { productId, productName, costPrice } = await findOrCreateProduct(row);
       recordsToInsert.push([
         defaultBizId,
         productId,
-        row.productName || row.product_name,
+        productName,
         Number(row.quantity || 1),
         Number(row.unitPrice || row.unit_price || 0),
         costPrice,
@@ -923,3 +997,5 @@ export const dbService = {
     await query("DELETE FROM products WHERE business_id = $1", [targetBizId]);
   },
 };
+
+export { productNameSimilarity, findBestProductMatch, normaliseProductName };
