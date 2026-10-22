@@ -8,6 +8,7 @@ function serializeScan(scan) {
   }));
   return {
     id: scan.id,
+    businessId: scan.businessId,
     fileName: scan.fileName,
     imageUrl: scan.imageUrl,
     createdAt: scan.createdAt,
@@ -57,7 +58,9 @@ export async function listScans(req, res, next) {
 export async function getScan(req, res, next) {
   try {
     const scan = await dbService.getScan(req.params.id);
-    if (!scan) return res.status(404).json({ error: "Scan not found." });
+    if (!scan || scan.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Scan not found." });
+    }
     res.json(serializeScan(scan));
   } catch (err) {
     next(err);
@@ -70,7 +73,9 @@ export async function updateExtractedRow(req, res, next) {
     const { productName, quantity, unitPrice, date } = req.body;
 
     const scan = await dbService.getScan(req.params.id);
-    if (!scan) return res.status(404).json({ error: "Scan not found." });
+    if (!scan || scan.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Scan not found." });
+    }
     const row = scan.extracted.find((r) => r.id === req.params.rid);
     if (!row) return res.status(404).json({ error: "Extracted row not found." });
 
@@ -88,6 +93,10 @@ export async function updateExtractedRow(req, res, next) {
 
 export async function deleteScan(req, res, next) {
   try {
+    const scan = await dbService.getScan(req.params.id);
+    if (!scan || scan.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Scan not found." });
+    }
     await dbService.deleteScan(req.params.id);
     res.status(204).send();
   } catch (err) {
@@ -99,7 +108,9 @@ export async function deleteScan(req, res, next) {
 export async function confirmScan(req, res, next) {
   try {
     const scan = await dbService.getScan(req.params.id);
-    if (!scan) return res.status(404).json({ error: "Scan not found." });
+    if (!scan || scan.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Scan not found." });
+    }
     if (scan.status === "saved") {
       return res.status(409).json({ error: "Scan already confirmed." });
     }

@@ -64,7 +64,9 @@ export async function listRecords(req, res, next) {
 export async function getRecord(req, res, next) {
   try {
     const record = await dbService.getRecord(req.params.id);
-    if (!record) return res.status(404).json({ error: "Record not found." });
+    if (!record || record.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Record not found." });
+    }
     res.json({ record });
   } catch (err) {
     next(err);
@@ -82,6 +84,13 @@ export async function createRecord(req, res, next) {
     }
     if (costPrice !== undefined && costPrice !== null && Number(costPrice) < 0) {
       return res.status(400).json({ error: "costPrice must be zero or more." });
+    }
+
+    if (productId) {
+      const product = await dbService.getProduct(productId);
+      if (!product || product.businessId !== req.businessId) {
+        return res.status(404).json({ error: "Product not found." });
+      }
     }
 
     const record = await dbService.createRecord({
@@ -106,7 +115,9 @@ export async function updateRecord(req, res, next) {
     const { productName, quantity, unitPrice, costPrice, status } = req.body;
 
     const existing = await dbService.getRecord(req.params.id);
-    if (!existing) return res.status(404).json({ error: "Record not found." });
+    if (!existing || existing.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Record not found." });
+    }
 
     const updated = await dbService.updateRecord(req.params.id, {
       productName,

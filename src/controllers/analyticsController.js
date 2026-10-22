@@ -34,11 +34,17 @@ export async function getAnalytics(req, res, next) {
         revenueLabel: formatCurrency(p.revenue, lang),
         trendLabel: trendLabel[p.trend] || "→",
       })),
-      slowMoving: data.slowMoving.map((p) => ({
-        ...p,
-        revenueLabel: formatCurrency(p.revenue, lang),
-        trendLabel: trendLabel[p.trend] || "→",
-      })),
+      slowMoving: data.slowMoving.map((p) => {
+        // Slow-moving products are not performing well. Never show an upward
+        // arrow for them: an increase in a slow item still means it is slow.
+        const trend = p.trend === "up" ? "down" : p.trend;
+        return {
+          ...p,
+          trend,
+          revenueLabel: formatCurrency(p.revenue, lang),
+          trendLabel: trendLabel[trend] || "→",
+        };
+      }),
     });
   } catch (err) {
     next(err);

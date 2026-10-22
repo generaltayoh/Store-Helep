@@ -25,3 +25,11 @@ export async function tokenAuth(req, _res, next) {
 
   next();
 }
+
+// Routes that read or write business data must have a valid session token.
+export function requireBusiness(req, res, next) {
+  if (!req.businessId) {
+    return res.status(401).json({ error: "Please log in to continue." });
+  }
+  next();
+}

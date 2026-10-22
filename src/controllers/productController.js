@@ -61,7 +61,9 @@ export async function createProductHandler(req, res, next) {
 export async function getProduct(req, res, next) {
   try {
     const product = await dbService.getProduct(req.params.id);
-    if (!product) return res.status(404).json({ error: "Product not found." });
+    if (!product || product.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Product not found." });
+    }
     res.json({ product });
   } catch (err) {
     next(err);
@@ -80,7 +82,9 @@ export async function updateProduct(req, res, next) {
     }
 
     const product = await dbService.getProduct(req.params.id);
-    if (!product) return res.status(404).json({ error: "Product not found." });
+    if (!product || product.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Product not found." });
+    }
 
     const updated = await dbService.updateProduct(req.params.id, {
       name,
@@ -97,7 +101,9 @@ export async function updateProduct(req, res, next) {
 export async function deleteProduct(req, res, next) {
   try {
     const product = await dbService.getProduct(req.params.id);
-    if (!product) return res.status(404).json({ error: "Product not found." });
+    if (!product || product.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Product not found." });
+    }
     await dbService.deleteProduct(req.params.id);
     res.status(204).send();
   } catch (err) {
@@ -113,7 +119,9 @@ export async function restockProduct(req, res, next) {
     }
 
     const product = await dbService.getProduct(req.params.id);
-    if (!product) return res.status(404).json({ error: "Product not found." });
+    if (!product || product.businessId !== req.businessId) {
+      return res.status(404).json({ error: "Product not found." });
+    }
     const updated = await dbService.restockProduct(req.params.id, addQty);
     res.json({ product: updated });
   } catch (err) {

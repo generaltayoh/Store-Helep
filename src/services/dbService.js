@@ -11,6 +11,17 @@ function startOfDay(d) {
   return x;
 }
 
+// Every write must belong to exactly one business. Never fall back to the
+// first business in the database: that would let accounts affect each other.
+function requireBusinessId(businessId) {
+  if (!businessId) {
+    const err = new Error("A business is required for this operation.");
+    err.status = 400;
+    throw err;
+  }
+  return businessId;
+}
+
 // Map snake_case database row to camelCase business object
 function mapBusiness(biz, settings) {
   if (!biz) return null;
@@ -41,6 +52,7 @@ function mapProduct(p) {
   const costPrice = Number(p.cost_price || 0);
   return {
     id: p.id,
+    businessId: p.business_id,
     name: p.name,
     category: p.category,
     unitPrice,
@@ -56,6 +68,7 @@ function mapRecord(r) {
   if (!r) return null;
   return {
     id: r.id,
+    businessId: r.business_id,
     productId: r.product_id,
     productName: r.product_name,
     quantity: Number(r.quantity || 0),
@@ -114,6 +127,7 @@ async function mapScan(scan, items = []) {
 
   return {
     id: scan.id,
+    businessId: scan.business_id,
     fileName: scan.file_name,
     imageUrl: scan.image_url,
     createdAt: new Date(scan.created_at),
@@ -302,6 +316,7 @@ export const dbService = {
   // --------------------------------------------------------------------------
   async listProducts({ category, stockStatus: statusFilter, businessId } = {}) {
     requirePool();
+    if (!businessId) return [];
 
     const conditions = [];
     const vals = [];
@@ -335,11 +350,7 @@ export const dbService = {
   async createProduct({ name, category, unitPrice = 0, costPrice = 0, stockQty = 0, businessId }) {
     requirePool();
 
-    let targetBizId = businessId;
-    if (!targetBizId) {
-      const biz = await this.getBusiness();
-      targetBizId = biz?.id;
-    }
+    const targetBizId = requireBusinessId(businessId);
 
     const { rows } = await query(
       `INSERT INTO products (business_id, name, category, unit_price, cost_price, stock_qty)
@@ -418,6 +429,7 @@ export const dbService = {
   // --------------------------------------------------------------------------
   async listRecords({ filter = "all", from, to, businessId } = {}) {
     requirePool();
+    if (!businessId) return [];
 
     const conditions = [];
     const vals = [];
@@ -458,11 +470,7 @@ export const dbService = {
   }) {
     requirePool();
 
-    let targetBizId = businessId;
-    if (!targetBizId) {
-      const biz = await this.getBusiness();
-      targetBizId = biz?.id;
-    }
+    const targetBizId = requireBusinessId(businessId);
 
     const qty = Number(quantity);
     const price = Number(unitPrice);
@@ -543,11 +551,7 @@ export const dbService = {
   async createScan({ fileName, imageUrl = null, extracted = [], businessId }) {
     requirePool();
 
-    let targetBizId = businessId;
-    if (!targetBizId) {
-      const biz = await this.getBusiness();
-      targetBizId = biz?.id;
-    }
+    const targetBizId = requireBusinessId(businessId);
 
     return withTransaction(async (client) => {
       const { rows } = await client.query(
@@ -588,6 +592,7 @@ export const dbService = {
 
   async listScans(businessId) {
     requirePool();
+    if (!businessId) return [];
 
     let scans;
     if (businessId) {
@@ -672,8 +677,8 @@ export const dbService = {
       throw err;
     }
 
-    const biz = await this.getBusiness();
-    const defaultBizId = biz?.id;
+    const defaultBizId = scan.businessId;
+    if (!defaultBizId) throw new Error("Scan is not linked to a business.");
 
     // Fetch current products to match unknown items
     let currentProducts = [];
@@ -907,9 +912,7 @@ export const dbService = {
 
   async clearAllData(businessId) {
     requirePool();
-    const biz = businessId ? null : await this.getBusiness();
-    const targetBizId = businessId || biz?.id;
-    if (!targetBizId) return;
+    const targetBizId = requireBusinessId(businessId);
 
     await query(
       "DELETE FROM scan_extracted_items WHERE scan_id IN (SELECT id FROM scans WHERE business_id = $1)",

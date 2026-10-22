@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import authRoutes from "./routes/auth.js";
-import { tokenAuth } from "./middleware/tokenAuth.js";
+import { tokenAuth, requireBusiness } from "./middleware/tokenAuth.js";
 import businessRoutes from "./routes/business.js";
 import scanRoutes from "./routes/scan.js";
 import recordRoutes from "./routes/record.js";
@@ -24,22 +24,25 @@ app.use(express.json());
 // API routes (mounted before static so they take precedence).
 app.use("/api/auth", authRoutes);
 app.use(tokenAuth);
-app.use("/api/business", businessRoutes);
-app.use("/api/scans", scanRoutes);
-app.use("/api/records", recordRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/analytics", analyticsRoutes);
-app.use("/api/export", exportRoutes);
+app.use("/api/business", requireBusiness, businessRoutes);
+app.use("/api/scans", requireBusiness, scanRoutes);
+app.use("/api/records", requireBusiness, recordRoutes);
+app.use("/api/products", requireBusiness, productRoutes);
+app.use("/api/dashboard", requireBusiness, dashboardRoutes);
+app.use("/api/analytics", requireBusiness, analyticsRoutes);
+app.use("/api/export", requireBusiness, exportRoutes);
 
 // Serve the existing static frontend.
 app.use(express.static(projectRoot));
 
 import { dbService } from "./services/dbService.js";
 
-app.post("/api/clear", async (_req, res) => {
+app.post("/api/clear", async (req, res) => {
   try {
-    await dbService.clearAllData();
+    if (!req.businessId) {
+      return res.status(401).json({ error: "Please log in to clear your data." });
+    }
+    await dbService.clearAllData(req.businessId);
     res.json({ cleared: true });
   } catch (e) {
     console.error("[clear] Database clear failed:", e.message);

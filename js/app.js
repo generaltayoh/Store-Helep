@@ -1296,15 +1296,9 @@ async function initDashboard() {
 let productSearch = "";
 
 function productCardHtml(p) {
-  const cost = Number(p.costPrice || 0);
-  const soldAt = Number(p.unitPrice || 0);
   return `<div class="card product-card" data-id="${p.id}">
     <span class="avatar ${stockClass(p.stockStatus)}">${initials(p.name)}</span>
-    <span class="mid"><b>${escapeHtml(p.name)}</b><span>${escapeHtml(t("prod.costShort"))}: ${fcfan(cost)}</span>${
-      soldAt > 0
-        ? `<span style="display:block;">${escapeHtml(t("prod.soldAtShort"))}: ${fcfan(soldAt)} · ${escapeHtml(t("prod.profitShort"))}: ${fcfan(soldAt - cost)}</span>`
-        : ""
-    }</span>
+    <span class="mid"><b>${escapeHtml(p.name)}</b><span>${fcfan(p.unitPrice)}</span></span>
     <span class="right"><b>${fmt(p.stockQty)}</b>
       <span class="badge ${stockClass(p.stockStatus)}">${labelFor(p.stockStatus)}</span>
       <span class="prod-actions">

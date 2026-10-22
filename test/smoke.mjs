@@ -99,12 +99,12 @@ async function main() {
     const health = await fetch(`${BASE}/api/health`);
     check("health endpoint", health.ok);
 
-    // Initial empty state verification
+    // Business data endpoints require a valid login before anything is exposed.
     const initStats = await json("GET", "/api/products/stats");
-    check("clean initial product stats (0 items)", initStats.status === 200 && initStats.data.totalProducts === 0);
+    check("unauthenticated product stats are blocked", initStats.status === 401);
 
     const initDash = await json("GET", "/api/dashboard");
-    check("clean initial dashboard (0 sales)", initDash.status === 200 && initDash.data.salesToday === 0);
+    check("unauthenticated dashboard is blocked", initDash.status === 401);
 
     // Auth / onboarding fresh business setup
     const setup = await json("POST", "/api/auth/setup", {
@@ -116,6 +116,7 @@ async function main() {
       recordMethod: "Notebook",
     });
     check("setup creates business", setup.status === 200 && setup.data.business.name === "Divine Grace Store");
+    authToken = setup.data.business.token || "";
 
     const biz = await json("GET", "/api/business");
     check("get business details", biz.status === 200 && biz.data.business.currency === "FCFA" && biz.data.business.location === "Limbe, Cameroon");
@@ -232,7 +233,11 @@ async function main() {
     );
     const fd = new FormData();
     fd.append("image", new Blob([fakeImage], { type: "image/jpeg" }), "sales_page.jpg");
-    const scanRes = await fetch(`${BASE}/api/scans`, { method: "POST", body: fd });
+    const scanRes = await fetch(`${BASE}/api/scans`, {
+      method: "POST",
+      headers: { token: authToken },
+      body: fd,
+    });
     const scanData = await scanRes.json();
 
     if (scanRes.status === 201) {
