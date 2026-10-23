@@ -18,7 +18,8 @@ const I18N = {
     "nav.home": "Home", "nav.records": "Records", "nav.scan": "Scan",
     "nav.products": "Products", "nav.analytics": "Analytics",
     "menu.language": "Language", "menu.business": "Business Info",
-    "menu.darkmode": "Dark mode", "menu.terms": "Terms & policies", "menu.logout": "Log out",
+    "menu.darkmode": "Dark mode", "menu.lightmode": "Light mode",
+    "menu.terms": "Terms & policies", "menu.logout": "Log out",
     "menu.install": "Install app",
 
     "common.cancel": "Cancel", "common.save": "Save", "common.add": "Add",
@@ -161,7 +162,8 @@ const I18N = {
     "nav.home": "Accueil", "nav.records": "Registres", "nav.scan": "Scanner",
     "nav.products": "Produits", "nav.analytics": "Analytique",
     "menu.language": "Langue", "menu.business": "Infos entreprise",
-    "menu.darkmode": "Mode sombre", "menu.terms": "Conditions et politiques", "menu.logout": "Déconnexion",
+    "menu.darkmode": "Mode sombre", "menu.lightmode": "Mode clair",
+    "menu.terms": "Conditions et politiques", "menu.logout": "Déconnexion",
     "menu.install": "Installer l'application",
 
     "common.cancel": "Annuler", "common.save": "Enregistrer", "common.add": "Ajouter",
@@ -2141,11 +2143,29 @@ window.bulkDeleteSelected = async function() {
 };
 
 /* ---------------- utils ---------------- */
+const ICONS = {
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+};
+
+function updateDarkModeBtn(on) {
+  const btn = document.getElementById("darkModeBtn");
+  if (!btn) return;
+  const key = on ? "menu.lightmode" : "menu.darkmode";
+  btn.setAttribute("data-i18n", key);
+  const svg = btn.querySelector("svg");
+  if (svg) svg.innerHTML = on ? ICONS.sun : ICONS.moon;
+  const direct = [...btn.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim());
+  if (direct.length) direct[direct.length - 1].textContent = t(key);
+  else btn.appendChild(document.createTextNode(" " + t(key)));
+}
+
 function applyDarkMode(on, sync = false) {
   document.documentElement.classList.toggle("dark", on);
   try {
     localStorage.setItem("sh_dark", on ? "1" : "0");
   } catch {}
+  updateDarkModeBtn(on);
   if (sync && state.token) {
     api("/business", { method: "PATCH", body: { darkMode: on } }).catch(() => {});
   }
